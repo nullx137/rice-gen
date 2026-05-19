@@ -135,6 +135,8 @@ class ConfigParser:
             hyprland_conf=self.json_content["hyprland_conf"],
             waybar_conf=self.json_content["waybar_conf"],
             waybar_config=self.json_content["waybar_config"],
+            wofi_conf=self.json_content.get("wofi_conf", ""),
+            wofi_config=self.json_content.get("wofi_config", ""),
             kitty_conf=self.json_content["kitty_conf"],
             color_scheme=self.json_content.get("color_scheme", {}),
             fonts=self.json_content.get("fonts", {}),
@@ -146,17 +148,19 @@ class ConfigParser:
 class ConfigGenerator:
     """Генератор файлов конфигов и скриптов установки."""
 
-    def __init__(self, config: GeneratedConfig, output_dir: str | Path):
+    def __init__(self, config: GeneratedConfig, output_dir: str | Path, wallpaper_tool: Optional[str] = None):
         """
         Инициализация генератора.
 
         Args:
             config: Объект GeneratedConfig с конфигурациями.
             output_dir: Директория для сохранения файлов.
+            wallpaper_tool: Инструмент для установки обоев (feh или hyprpaper).
         """
         self.config = config
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.wallpaper_tool = (wallpaper_tool or settings.WALLPAPER_TOOL).lower()
 
     def generate_all(self) -> dict[str, Path]:
         """
@@ -177,12 +181,16 @@ class ConfigGenerator:
         paths["waybar_config"] = self._save_file(
             "waybar_config.json", self.config.waybar_config
         )
-        paths["wofi_style"] = self._save_file(
-            "wofi_style.css", self.config.wofi_conf
-        )
-        paths["wofi_config"] = self._save_file(
-            "wofi_config", self.config.wofi_config
-        )
+        
+        if self.config.wofi_conf:
+            paths["wofi_style"] = self._save_file(
+                "wofi_style.css", self.config.wofi_conf
+            )
+        if self.config.wofi_config:
+            paths["wofi_config"] = self._save_file(
+                "wofi_config", self.config.wofi_config
+            )
+            
         paths["kitty"] = self._save_file("kitty.conf", self.config.kitty_conf)
 
         # Копируем обои, если они есть
@@ -238,11 +246,11 @@ class ConfigGenerator:
         if self.config.wallpaper_path:
             wallpaper_install = f'''
 if [ -f "$SCRIPT_DIR/wallpaper.png" ]; then
-    echo -e "${{YELLOW}}[5.5/6] Установка обоев ({settings.WALLPAPER_TOOL})...${{NC}}"
+    echo -e "${{YELLOW}}[5.5/6] Установка обоев ({self.wallpaper_tool})...${{NC}}"
     mkdir -p "$HOME/.config/hypr"
     cp "$SCRIPT_DIR/wallpaper.png" "$HOME/.config/hypr/wallpaper.png"
     
-    if [ "{settings.WALLPAPER_TOOL}" = "hyprpaper" ]; then
+    if [ "{self.wallpaper_tool}" = "hyprpaper" ]; then
         # Настройка hyprpaper
         cat > "$HOME/.config/hypr/hyprpaper.conf" << EOF
 preload = $HOME/.config/hypr/wallpaper.png
@@ -254,7 +262,7 @@ EOF
         fi
         hyprpaper &
         echo "  ✓ hyprpaper запущен"
-    elif [ "{settings.WALLPAPER_TOOL}" = "feh" ]; then
+    elif [ "{self.wallpaper_tool}" = "feh" ]; then
         feh --bg-fill "$HOME/.config/hypr/wallpaper.png"
         echo "  ✓ feh установлен"
     fi
@@ -326,8 +334,12 @@ echo "  ✓ Waybar конфиги установлены"
 
 echo -e "${{YELLOW}}[4/6] Установка конфигов Wofi...${{NC}}"
 mkdir -p "$HOME/.config/wofi"
-cp "$SCRIPT_DIR/wofi_config" "$HOME/.config/wofi/config"
-cp "$SCRIPT_DIR/wofi_style.css" "$HOME/.config/wofi/style.css"
+if [ -f "$SCRIPT_DIR/wofi_config" ]; then
+    cp "$SCRIPT_DIR/wofi_config" "$HOME/.config/wofi/config"
+fi
+if [ -f "$SCRIPT_DIR/wofi_style.css" ]; then
+    cp "$SCRIPT_DIR/wofi_style.css" "$HOME/.config/wofi/style.css"
+fi
 echo "  ✓ Wofi конфиги установлены"
 
 echo -e "${{YELLOW}}[5/6] Установка конфигов Kitty...${{NC}}"

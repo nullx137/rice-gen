@@ -18,6 +18,7 @@ class SeparateGenerator:
         api_key: Optional[str] = None,
         model: Optional[str] = None,
         provider: Optional[str] = None,
+        wallpaper_model: Optional[str] = None,
     ):
         """
         Инициализация генератора.
@@ -26,6 +27,7 @@ class SeparateGenerator:
             api_key: API ключ.
             model: Модель для анализа.
             provider: API провайдер (openrouter или cometapi).
+            wallpaper_model: Модель для генерации обоев.
         """
         self.provider = provider or settings.API_PROVIDER
         if self.provider == "cometapi":
@@ -33,6 +35,7 @@ class SeparateGenerator:
         else:
             self.api_key = api_key or settings.OPENROUTER_API_KEY
         self.model = model or settings.MODEL
+        self.wallpaper_model = wallpaper_model or settings.WALLPAPER_MODEL
 
     def generate_hyprland(
         self,
@@ -180,11 +183,9 @@ class SeparateGenerator:
         
         # 2. Генерируем изображение
         # Используем модель для генерации картинок
-        with OpenRouterClient(self.api_key, settings.WALLPAPER_MODEL, self.provider) as client:
-            # Внимание: это упрощенная реализация. 
-            # Предполагаем, что API возвращает JSON с полем "url" или "image_url"
+        with OpenRouterClient(self.api_key, self.wallpaper_model, self.provider) as client:
             payload = {
-                "model": settings.WALLPAPER_MODEL,
+                "model": self.wallpaper_model,
                 "messages": [{"role": "user", "content": f"Generate a high-quality 4k wallpaper: {image_prompt}"}],
             }
             
@@ -194,7 +195,6 @@ class SeparateGenerator:
             data = response.json()
             
             # Пытаемся извлечь URL изображения из ответа
-            # Это зависит от конкретного API, здесь пример для OpenRouter/DALL-E
             image_url = data.get("choices", [{}])[0].get("message", {}).get("content", "")
             
             # Если API вернуло URL, скачиваем его
@@ -204,7 +204,6 @@ class SeparateGenerator:
                 output_path.write_bytes(img_response.content)
             else:
                 # Если API вернуло base64 или другой формат, нужно обработать
-                # Для примера просто сохраним как есть, если это base64
                 output_path.write_text(image_url)
             
         return Path(output_path)

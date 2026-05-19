@@ -4,6 +4,7 @@ import json
 import sys
 import time
 from pathlib import Path
+from typing import Optional
 
 from .openrouter_client import OpenRouterClient
 from .config_parser import ConfigParser, ConfigGenerator
@@ -102,6 +103,8 @@ class RiceGenerator:
         separate: bool = True,
         hyprland_config: str | Path | None = None,
         provider: str | None = None,
+        wallpaper_model: str | None = None,
+        wallpaper_tool: str | None = None,
     ):
         """
         Инициализация генератора.
@@ -111,15 +114,19 @@ class RiceGenerator:
             templates_dir: Директория с шаблонами.
             model: Модель для анализа (по умолчанию из конфига).
             separate: Использовать раздельные запросы (рекомендуется).
-            hyprland_config: Путь к пользовательскому hyprland.conf (по умолчанию: встроенный шаблон).
+            hyprland_config: Путь к пользовательскому hyprland.conf.
             provider: API провайдер (openrouter или cometapi).
+            wallpaper_model: Модель для генерации обоев.
+            wallpaper_tool: Инструмент для установки обоев.
         """
         self.api_key = api_key
         self.templates_dir = Path(templates_dir) if templates_dir else None
-        self.model = model
+        self.model = model or settings.MODEL
         self.separate = separate
         self.hyprland_config = Path(hyprland_config) if hyprland_config else None
         self.provider = provider or settings.API_PROVIDER
+        self.wallpaper_model = wallpaper_model or settings.WALLPAPER_MODEL
+        self.wallpaper_tool = wallpaper_tool or settings.WALLPAPER_TOOL
 
         if self.templates_dir is None:
             self.templates_dir = Path(__file__).parent / "templates"
@@ -146,7 +153,6 @@ class RiceGenerator:
             raise FileNotFoundError(f"Скриншот не найден: {screenshot_path}")
 
         # Загрузка шаблонов
-        # Используем пользовательский hyprland.conf или встроенный шаблон
         if self.hyprland_config and self.hyprland_config.exists():
             print(f"📄 Используем ваш hyprland.conf: {self.hyprland_config}")
             hyprland_template = self.hyprland_config.read_text()
@@ -161,11 +167,16 @@ class RiceGenerator:
 
         if self.separate:
             print("📸 Анализ скриншота...")
-            print(f"🤖 Модель: {self.model or settings.MODEL}")
+            print(f"🤖 Модель: {self.model}")
             print("=" * 40)
 
             # Используем раздельные запросы
-            generator = SeparateGenerator(self.api_key, self.model, self.provider)
+            generator = SeparateGenerator(
+                self.api_key, 
+                self.model, 
+                self.provider,
+                wallpaper_model=self.wallpaper_model
+            )
 
             # 1. Генерация Hyprland
             spinner.start("Генерация Hyprland...", BLUE)
@@ -243,7 +254,6 @@ class RiceGenerator:
                 spinner.stop(success=True)
             except Exception:
                 spinner.stop(success=False)
-                # Не прерываем, если обои не сгенерировались
                 wallpaper_path = None
 
             print("=" * 40)
@@ -266,14 +276,10 @@ class RiceGenerator:
                 wallpaper_path=wallpaper_path,
             )
         else:
+            # Старый метод (единый запрос)
             print("📸 Анализ скриншота...")
-            print(f"🤖 Модель: {self.model or settings.MODEL}")
-            print("🤖 Отправка запроса к нейросети...")
-
-            # Загрузка шаблона Hyprland для старого метода
-            hyprland_template = (self.templates_dir / "hyprland.conf").read_text()
-
-            # Анализ скриншота через API (старый метод)
+            print(f"🤖 Модель: {self.model}")
+            
             with OpenRouterClient(self.api_key, self.model, self.provider) as client:
                 response = client.analyze_screenshot(
                     screenshot_path=screenshot_path,
@@ -283,55 +289,14 @@ class RiceGenerator:
                 )
 
             print("📝 Обработка ответа...")
-
-            # Парсинг ответа
             parser = ConfigParser(response)
             config = parser.parse()
 
         # Генерация файлов
-        gen = ConfigGenerator(config, output_dir)
+        gen = ConfigGenerator(config, output_dir, wallpaper_tool=self.wallpaper_tool)
         paths = gen.generate_all()
 
         print(f"✅ Конфиги сгенерированы в: {output_dir.absolute()}")
         print(f"📄 Файлов создано: {len(paths)}")
 
         return paths
-
-    def _get_waybar_style_template(self) -> str:
-        """Возвращает шаблон style.css для Waybar."""
-        style_path = self.templates_dir / "waybar_style.css"
-        if style_path.exists():
-            return style_path.read_text()
-
-        # Шаблон по умолчанию
-        return """* {
-    font-family: "JetBrainsMono Nerd Font";
-    font-size: 14px;
-    min-height: 30px;
-}
-
-window#waybar {
-    background: rgba(30, 30, 46, 0.9);
-    color: #c0caf5;
-}
-
-#workspaces {
-    background: #1a1b26;
-}
-
-#workspaces button {
-    padding: 0 10px;
-    color: #c0caf5;
-}
-
-#workspaces button.active {
-    background: #7aa2f7;
-    color: #1a1b26;
-}
-
-#clock {
-    background: #7aa2f7;
-    color: #1a1b26;
-    padding: 0 10px;
-}
-"""

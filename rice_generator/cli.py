@@ -19,18 +19,14 @@ def main():
 Примеры использования:
   %(prog)s screenshot.png -o ./output
   %(prog)s ~/Pictures/rice.png --api-key your_key
-  %(prog)s screenshot.png -o ./my-rice --templates ./custom-templates
-  %(prog)s screenshot.png --model google/gemini-2.0-flash-001
-  %(prog)s screenshot.png -H ~/.config/hypr/hyprland.conf  # использовать свой конфиг
-  %(prog)s screenshot.png --provider cometapi --api-key your_key  # использовать CometAPI
+  %(prog)s screenshot.png --wallpaper-model openai/dall-e-3 --wallpaper-tool feh
 
 Переменные окружения:
   API_PROVIDER           Провайдер API: openrouter или cometapi (по умолчанию: openrouter)
   OPENROUTER_API_KEY     API ключ для OpenRouter
-  COMETAPI_API_KEY     API ключ для CometAPI
-  RICE_MODEL            Модель для анализа (по умолчанию: google/gemini-2.0-flash-exp:free)
-  REQUEST_TIMEOUT       Таймаут запроса в секундах (по умолчанию: 120)
-  MAX_TOKENS            Максимум токенов в ответе (по умолчанию: 4096)
+  RICE_MODEL            Модель для анализа (по умолчанию: google/gemini-3-flash-preview)
+  WALLPAPER_MODEL       Модель для генерации обоев (по умолчанию: openai/dall-e-3)
+  WALLPAPER_TOOL        Инструмент для установки обоев: hyprpaper или feh
         """,
     )
 
@@ -72,6 +68,21 @@ def main():
     )
 
     parser.add_argument(
+        "--wallpaper-model",
+        type=str,
+        default=None,
+        help="Модель для генерации обоев (по умолчанию: из конфига)",
+    )
+
+    parser.add_argument(
+        "--wallpaper-tool",
+        type=str,
+        choices=["hyprpaper", "feh"],
+        default=None,
+        help="Инструмент для установки обоев (по умолчанию: из конфига)",
+    )
+
+    parser.add_argument(
         "-t",
         "--templates",
         type=str,
@@ -102,11 +113,6 @@ def main():
 
     args = parser.parse_args()
 
-    # Проверка наличия API ключа
-    api_key = args.api_key or Path.cwd() / ".env"
-    if not api_key:
-        api_key = None
-
     try:
         provider = args.provider or settings.API_PROVIDER
         print("🚀 Rice Generator v0.1.0")
@@ -119,6 +125,8 @@ def main():
             model=args.model,
             hyprland_config=args.hyprland_config,
             provider=provider,
+            wallpaper_model=args.wallpaper_model,
+            wallpaper_tool=args.wallpaper_tool,
         )
 
         paths = generator.generate(
@@ -168,7 +176,6 @@ def main():
     except Exception as e:
         if args.verbose:
             import traceback
-
             traceback.print_exc()
         else:
             print(f"❌ Произошла ошибка: {e}", file=sys.stderr)

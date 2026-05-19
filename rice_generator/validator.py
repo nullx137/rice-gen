@@ -119,6 +119,14 @@ class AIValidator:
         if waybar_style.exists():
             configs["waybar_style"] = waybar_style.read_text(encoding="utf-8")
 
+        wofi_config = output_dir / "wofi_config"
+        if wofi_config.exists():
+            configs["wofi_config"] = wofi_config.read_text(encoding="utf-8")
+
+        wofi_style = output_dir / "wofi_style.css"
+        if wofi_style.exists():
+            configs["wofi_style"] = wofi_style.read_text(encoding="utf-8")
+
         kitty = output_dir / "kitty.conf"
         if kitty.exists():
             configs["kitty"] = kitty.read_text(encoding="utf-8")
@@ -181,7 +189,7 @@ class AIValidator:
         return f"""Ты эксперт по Linux rice. Проверь конфиги на соответствие скриншоту.
 
 ## ГЛАВНАЯ ЗАДАЧА:
-Внимательно рассмотри скриншот и проверь конфиги Waybar на наличие и правильное расположение модулей.
+Внимательно рассмотри скриншот и проверь конфиги Waybar и Wofi на наличие и правильное расположение модулей.
 
 ## 🔍 ПРОВЕРКА WAYBAR — МОДУЛИ (ПРИОРИТЕТ #1):
 
@@ -196,36 +204,23 @@ class AIValidator:
 - Какие модули СЛЕВА? (обычно: workspaces, tray)
 - Какие модули ПО ЦЕНТРУ? (обычно: window, media)
 - Какие модули СПРАВА? (обычно: audio, network, battery, clock)
-- Правильный ли порядок?
 
-### 3. Внешний вид модулей:
-- Есть ли иконки у модулей? (🔊, 📶, 🔋, 🕐)
-- Правильный ли формат вывода?
-- Видны ли все модули или какие-то скрыты?
-- Нет ли "квадратов" вместо иконок?
-
-### 4. Структура бара:
-- Цельный бар (сплошная полоса) или раздельный (модули отдельно)?
-- Прозрачный или сплошной фон?
-- Высота бара соответствует скриншоту?
+## 🔍 ПРОВЕРКА WOFI (если есть):
+- Соответствуют ли цвета фона и текста скриншоту?
+- Правильный ли размер окна (width, height)?
+- Есть ли иконки (allow_images)?
 
 ## 📝 ПРОВЕРКА ДРУГИХ КОНФИГОВ:
 
 ### Hyprland (если есть):
 - gaps_in / gaps_out — совпадают ли отступы
 - col.active_border — цвет активной рамки
-- col.inactive_border — цвет неактивной рамки
 - rounding — скругления углов
 - active_opacity / inactive_opacity — прозрачность
-- border_size — толщина рамок
-- shadow.enabled, shadow.range — тени
-- blur.enabled, blur.size — блюр
 
 ### Kitty (если есть):
 - foreground / background — цвета
-- color0-15 — палитра
 - font_family / font_size — шрифт
-- window_padding_width — отступы
 
 ## Конфигурационные файлы:
 {configs_text}
@@ -237,24 +232,18 @@ class AIValidator:
   "issues": [
     {{
       "file": "waybar_config",
-      "description": "Отсутствует модуль clock в modules-right — на скриншоте видно часы справа",
+      "description": "Отсутствует модуль clock в modules-right",
       "severity": "error",
       "suggestion": "Добавь 'custom/clock' в modules-right"
     }},
     {{
-      "file": "waybar_config",
-      "description": "Модуль battery есть в конфиге, но на скриншоте его нет",
+      "file": "wofi_style",
+      "description": "Цвет фона слишком темный",
       "severity": "warning",
-      "suggestion": "Удали 'battery' из modules-right"
-    }},
-    {{
-      "file": "hyprland",
-      "description": "gaps_in = 5, но на скриншоте отступы больше (~10)",
-      "severity": "error",
-      "suggestion": "Измени gaps_in на 10"
+      "suggestion": "Измени background-color на #..."
     }}
   ],
-  "summary": "Найдено 3 замечания"
+  "summary": "Найдено X замечаний"
 }}
 ```
 """
@@ -289,6 +278,8 @@ class AIValidator:
   "hyprland": "# исправленный конфиг hyprland",
   "waybar_config": "{{ ... }}",
   "waybar_style": "/* исправленный CSS */",
+  "wofi_config": "mode=drun...",
+  "wofi_style": "/* исправленный CSS */",
   "kitty": "# исправленный конфиг kitty"
 }}
 ```
@@ -327,10 +318,11 @@ class AIValidator:
         if match:
             try:
                 data = json.loads(match.group(1))
+                allowed_keys = ["hyprland", "waybar_config", "waybar_style", "wofi_config", "wofi_style", "kitty"]
                 return {
                     key: value
                     for key, value in data.items()
-                    if key in ["hyprland", "waybar_config", "waybar_style", "kitty"]
+                    if key in allowed_keys
                 }
             except json.JSONDecodeError:
                 pass
@@ -343,6 +335,8 @@ class AIValidator:
             "hyprland": "hyprland.conf",
             "waybar_config": "waybar_config.json",
             "waybar_style": "waybar_style.css",
+            "wofi_config": "wofi_config",
+            "wofi_style": "wofi_style.css",
             "kitty": "kitty.conf",
         }
 
