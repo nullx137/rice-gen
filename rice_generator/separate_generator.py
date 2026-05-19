@@ -182,8 +182,10 @@ class SeparateGenerator:
         print(f"🎨 Генерация обоев по промпту: {image_prompt[:50]}...")
         
         # 2. Генерируем изображение
-        # Используем модель для генерации картинок
+        # Используем модель для генерации картинок, указанную в настройках или переданную в конструктор
         with OpenRouterClient(self.api_key, self.wallpaper_model, self.provider) as client:
+            # Внимание: это упрощенная реализация. 
+            # Предполагаем, что API возвращает JSON с полем "url" или "image_url"
             payload = {
                 "model": self.wallpaper_model,
                 "messages": [{"role": "user", "content": f"Generate a high-quality 4k wallpaper: {image_prompt}"}],
@@ -195,6 +197,7 @@ class SeparateGenerator:
             data = response.json()
             
             # Пытаемся извлечь URL изображения из ответа
+            # Это зависит от конкретного API, здесь пример для OpenRouter/DALL-E
             image_url = data.get("choices", [{}])[0].get("message", {}).get("content", "")
             
             # Если API вернуло URL, скачиваем его
@@ -204,6 +207,7 @@ class SeparateGenerator:
                 output_path.write_bytes(img_response.content)
             else:
                 # Если API вернуло base64 или другой формат, нужно обработать
+                # Для примера просто сохраним как есть, если это base64
                 output_path.write_text(image_url)
             
         return Path(output_path)
@@ -318,7 +322,7 @@ class SeparateGenerator:
 - layer: "top" или "bottom"
 - position: "top" или "bottom"
 - height: высота бара (обычно 30-40)
-- modules-left: [список модулей слева]
+- modules-left: [спивое модулей слева]
 - modules-center: [список модулей по центру]
 - modules-right: [список модулей справа]
 - Настройки каждого модуля

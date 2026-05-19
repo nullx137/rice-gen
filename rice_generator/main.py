@@ -167,7 +167,8 @@ class RiceGenerator:
 
         if self.separate:
             print("📸 Анализ скриншота...")
-            print(f"🤖 Модель: {self.model}")
+            print(f"🤖 Модель анализа: {self.model}")
+            print(f"🎨 Модель обоев: {self.wallpaper_model}")
             print("=" * 40)
 
             # Используем раздельные запросы
