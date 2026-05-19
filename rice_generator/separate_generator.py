@@ -182,22 +182,20 @@ class SeparateGenerator:
         print(f"🎨 Генерация обоев по промпту: {image_prompt[:50]}...")
         
         # 2. Генерируем изображение
-        # Используем модель для генерации картинок, указанную в настройках или переданную в конструктор
+        # Используем выбранного провайдера (OpenRouter или CometAPI)
         with OpenRouterClient(self.api_key, self.wallpaper_model, self.provider) as client:
-            # Внимание: это упрощенная реализация. 
-            # Предполагаем, что API возвращает JSON с полем "url" или "image_url"
             payload = {
                 "model": self.wallpaper_model,
                 "messages": [{"role": "user", "content": f"Generate a high-quality 4k wallpaper: {image_prompt}"}],
             }
             
-            # Отправляем запрос
+            # Отправляем запрос через настроенный клиент провайдера
             response = client.client.post("/chat/completions", json=payload)
             response.raise_for_status()
             data = response.json()
             
             # Пытаемся извлечь URL изображения из ответа
-            # Это зависит от конкретного API, здесь пример для OpenRouter/DALL-E
+            # Большинство провайдеров возвращают URL в контенте сообщения или в поле url
             image_url = data.get("choices", [{}])[0].get("message", {}).get("content", "")
             
             # Если API вернуло URL, скачиваем его
@@ -206,8 +204,7 @@ class SeparateGenerator:
                 img_response.raise_for_status()
                 output_path.write_bytes(img_response.content)
             else:
-                # Если API вернуло base64 или другой формат, нужно обработать
-                # Для примера просто сохраним как есть, если это base64
+                # Если API вернуло base64 или другой формат, сохраняем как текст (или нужно декодировать)
                 output_path.write_text(image_url)
             
         return Path(output_path)
@@ -355,7 +352,7 @@ class SeparateGenerator:
 ## КРИТИЧЕСКИ ВАЖНО:
 - Пиши ТОЛЬКО чистый код БЕЗ комментариев
 - Не используй # комментарии в конфиге
-- Верни ПОЛНЫЙ конфиг без сокращений
+- Верни ПОЛНЫЕ файлы без сокращений
 
 ## Распознай со скриншота:
 - Цветовую схему (foreground, background, color0-15)
