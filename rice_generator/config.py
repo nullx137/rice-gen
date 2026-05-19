@@ -26,8 +26,12 @@ class Settings:
         "COMETAPI_BASE_URL", "https://api.cometapi.com/v1"
     )
 
-    # === Модель ===
+    # === Модели ===
     MODEL: str = os.getenv("RICE_MODEL", "google/gemini-3-flash-preview")
+    WALLPAPER_MODEL: str = os.getenv("WALLPAPER_MODEL", "openai/dall-e-3")
+
+    # === Инструменты ===
+    WALLPAPER_TOOL: str = os.getenv("WALLPAPER_TOOL", "hyprpaper").lower()
 
     # === Таймауты ===
     REQUEST_TIMEOUT: int = int(os.getenv("REQUEST_TIMEOUT", "120"))

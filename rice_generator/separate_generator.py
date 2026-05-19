@@ -2,7 +2,7 @@
 
 import json
 import re
-import time
+import httpx
 from pathlib import Path
 from typing import Optional
 
@@ -152,24 +152,23 @@ class SeparateGenerator:
         self,
         screenshot_path: str | Path,
         output_path: str | Path,
-    ) -> str:
+    ) -> Path:
         """
-        Анализирует скриншот и генерирует новые обои в том же стиле.
+        Анализирует скриншот и генерирует новые обои.
 
         Args:
             screenshot_path: Путь к скриншоту для анализа.
             output_path: Куда сохранить сгенерированные обои.
 
         Returns:
-            Текст промпта, который использовался для генерации.
+            Путь к сохраненному файлу обоев.
         """
         # 1. Генерируем промпт для картинки
         analysis_prompt = """Проанализируй этот скриншот рабочего стола Linux. 
 Составь подробный промпт для ИИ-генератора изображений (например, Flux или DALL-E), 
 чтобы создать идеальные абстрактные обои (4k), которые будут сочетаться с этим интерфейсом по цветам и настроению.
 
-Верни ТОЛЬКО текст промпта на английском языке, без вводных слов и кавычек. 
-Сфокусируйся на цветах, стиле (minimalist, cyberpunk, flat и т.д.) и композиции."""
+Верни ТОЛЬКО текст промпта на английском языке, без вводных слов и кавычек."""
 
         with OpenRouterClient(self.api_key, self.model, self.provider) as client:
             image_prompt = client.analyze_image_with_prompt(
@@ -177,24 +176,38 @@ class SeparateGenerator:
                 prompt=analysis_prompt
             ).strip()
 
-        # 2. Генерируем само изображение (используем специальную модель для картинок)
-        # По умолчанию пробуем OpenAI DALL-E 3 или Google Imagen через OpenRouter
-        img_model = "openai/dall-e-3" if self.provider == "openrouter" else self.model
+        print(f"🎨 Генерация обоев по промпту: {image_prompt[:50]}...")
         
-        print(f"🎨 Генерируем обои по промпту: {image_prompt[:50]}...")
-        
-        with OpenRouterClient(self.api_key, img_model, self.provider) as client:
-            # Для генерации картинок в OpenRouter используется тот же эндпоинт, 
-            # но промпт отправляется как обычный текст. 
-            # Внимание: некоторые провайдеры возвращают URL в ответе.
+        # 2. Генерируем изображение
+        # Используем модель для генерации картинок
+        with OpenRouterClient(self.api_key, settings.WALLPAPER_MODEL, self.provider) as client:
+            # Внимание: это упрощенная реализация. 
+            # Предполагаем, что API возвращает JSON с полем "url" или "image_url"
             payload = {
-                "model": img_model,
+                "model": settings.WALLPAPER_MODEL,
                 "messages": [{"role": "user", "content": f"Generate a high-quality 4k wallpaper: {image_prompt}"}],
             }
-            # Это упрощенная реализация. В реальности нам нужно скачать файл по URL.
-            # Для прототипа мы предположим, что API возвращает URL или base64.
             
-        return image_prompt
+            # Отправляем запрос
+            response = client.client.post("/chat/completions", json=payload)
+            response.raise_for_status()
+            data = response.json()
+            
+            # Пытаемся извлечь URL изображения из ответа
+            # Это зависит от конкретного API, здесь пример для OpenRouter/DALL-E
+            image_url = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+            
+            # Если API вернуло URL, скачиваем его
+            if image_url.startswith("http"):
+                img_response = httpx.get(image_url)
+                img_response.raise_for_status()
+                output_path.write_bytes(img_response.content)
+            else:
+                # Если API вернуло base64 или другой формат, нужно обработать
+                # Для примера просто сохраним как есть, если это base64
+                output_path.write_text(image_url)
+            
+        return Path(output_path)
 
     def _build_hyprland_prompt(self, template: str) -> str:
         """Создаёт промпт для Hyprland — только замена переменных."""
@@ -330,19 +343,6 @@ class SeparateGenerator:
 Верни ТОЛЬКО чистый JSON и CSS БЕЗ markdown разметки (без ```json, ```css и т.д.)
 
 Сначала JSON конфиг, потом CSS стиль (разделённые пустой строкой).
-
-```css
-* {{
-    font-family: "JetBrainsMono Nerd Font";
-    font-size: 14px;
-}}
-
-window#waybar {{
-    background: rgba(30, 30, 46, 0.8); /* или solid цвет */
-    border-radius: 10px;
-}}
-...
-```
 """
 
     def _build_kitty_prompt(self, template: str) -> str:
@@ -428,30 +428,9 @@ color1 #f7768e
 {style_template}
 
 ## Формат ответа:
-```config
-mode=drun
-width=30%
-height=40%
-location=center
-show=drun
-...
-
-## Формат ответа:
 Верни ТОЛЬКО чистый код БЕЗ markdown разметки (без ```config, ```css и т.д.)
 
 Сначала wofi_config, потом wofi_style.css (разделённые пустой строкой).
-
-```css
-window {{
-    background-color: #1e1e2e;
-    color: #cdd6f4;
-    ...
-}}
-#input {{
-    ...
-}}
-...
-```
 """
 
     def _extract_wofi_config(self, text: str) -> str:
@@ -492,39 +471,6 @@ window {{
 
         # Если не найдено, возвращаем весь текст
         return text.strip()
-
-    def _extract_color_json(self, text: str) -> dict:
-        """Извлекает JSON с цветами и параметрами."""
-        match = re.search(r"```(?:json)?\s*({.*?})\s*```", text, re.DOTALL)
-        if match:
-            json_str = match.group(1)
-            try:
-                return json.loads(json_str)
-            except json.JSONDecodeError:
-                pass
-
-        # Если не найдено, пробуем найти JSON без markdown блока
-        match = re.search(r"\{.*\}", text, re.DOTALL)
-        if match:
-            try:
-                return json.loads(match.group(0))
-            except json.JSONDecodeError:
-                pass
-
-        # Возвращаем пустой словарь с подсказками
-        return {
-            "error": "Не удалось распознать цвета",
-            "manual_setup": True,
-            "variables": {
-                "gaps_in": 5,
-                "gaps_out": 20,
-                "active_border": "rgba(33ccffaa)",
-                "inactive_border": "rgba(595959aa)",
-                "active_opacity": 1.0,
-                "inactive_opacity": 0.9,
-                "rounding": 10,
-            },
-        }
 
     def _extract_json_config(self, text: str) -> str:
         """Извлекает JSON конфиг."""

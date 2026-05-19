@@ -232,6 +232,20 @@ class RiceGenerator:
                 spinner.stop(success=False)
                 raise
 
+            # 5. Генерация обоев
+            wallpaper_path = output_dir / "wallpaper.png"
+            spinner.start("Генерация обоев...", CYAN)
+            try:
+                generator.generate_wallpaper(
+                    screenshot_path=screenshot_path,
+                    output_path=wallpaper_path,
+                )
+                spinner.stop(success=True)
+            except Exception:
+                spinner.stop(success=False)
+                # Не прерываем, если обои не сгенерировались
+                wallpaper_path = None
+
             print("=" * 40)
             print("📝 Обработка результатов...")
 
@@ -249,6 +263,7 @@ class RiceGenerator:
                 fonts={},
                 gaps={},
                 notes="Сгенерировано с раздельными запросами",
+                wallpaper_path=wallpaper_path,
             )
         else:
             print("📸 Анализ скриншота...")

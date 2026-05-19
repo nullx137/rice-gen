@@ -2,9 +2,12 @@
 
 import json
 import re
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
+
+from .config import settings
 
 
 @dataclass
@@ -182,6 +185,12 @@ class ConfigGenerator:
         )
         paths["kitty"] = self._save_file("kitty.conf", self.config.kitty_conf)
 
+        # Копируем обои, если они есть
+        if self.config.wallpaper_path and self.config.wallpaper_path.exists():
+            dest = self.output_dir / "wallpaper.png"
+            shutil.copy(self.config.wallpaper_path, dest)
+            paths["wallpaper"] = dest
+
         # Генерируем скрипты
         paths["installer"] = self._generate_installer()
         paths["uninstaller"] = self._generate_uninstaller()
@@ -225,7 +234,34 @@ class ConfigGenerator:
         Returns:
             Путь к скрипту установщика.
         """
-        script = '''#!/bin/bash
+        wallpaper_install = ""
+        if self.config.wallpaper_path:
+            wallpaper_install = f'''
+if [ -f "$SCRIPT_DIR/wallpaper.png" ]; then
+    echo -e "${{YELLOW}}[5.5/6] Установка обоев ({settings.WALLPAPER_TOOL})...${{NC}}"
+    mkdir -p "$HOME/.config/hypr"
+    cp "$SCRIPT_DIR/wallpaper.png" "$HOME/.config/hypr/wallpaper.png"
+    
+    if [ "{settings.WALLPAPER_TOOL}" = "hyprpaper" ]; then
+        # Настройка hyprpaper
+        cat > "$HOME/.config/hypr/hyprpaper.conf" << EOF
+preload = $HOME/.config/hypr/wallpaper.png
+wallpaper = ,$HOME/.config/hypr/wallpaper.png
+EOF
+        if pgrep -x "hyprpaper" > /dev/null; then
+            killall hyprpaper
+            sleep 1
+        fi
+        hyprpaper &
+        echo "  ✓ hyprpaper запущен"
+    elif [ "{settings.WALLPAPER_TOOL}" = "feh" ]; then
+        feh --bg-fill "$HOME/.config/hypr/wallpaper.png"
+        echo "  ✓ feh установлен"
+    fi
+fi
+'''
+
+        script = f'''#!/bin/bash
 # Installer для rice конфига
 # Сгенерировано rice-generator
 
@@ -242,17 +278,17 @@ NC='\\033[0m' # No Color
 
 # Проверка прав суперпользователя
 if [ "$EUID" -eq 0 ]; then
-    echo -e "${RED}Не запускайте скрипт от root!${NC}"
+    echo -e "${{RED}}Не запускайте скрипт от root!${{NC}}"
     exit 1
 fi
 
 # Директория со скриптом
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+SCRIPT_DIR="$( cd "$( dirname "${{BASH_SOURCE[0]}}" )" && pwd )"
 
 # Бэкап текущих конфигов
 BACKUP_DIR="$HOME/.config/rice_backups/backup_$(date +%Y%m%d_%H%M%S)"
 
-echo -e "${YELLOW}[1/5] Создание бэкапа текущих конфигов...${NC}"
+echo -e "${{YELLOW}}[1/5] Создание бэкапа текущих конфигов...${{NC}}"
 mkdir -p "$BACKUP_DIR"
 
 # Бэкап Hyprland
@@ -273,46 +309,35 @@ if [ -d "$HOME/.config/kitty" ]; then
     echo "  ✓ Kitty конфиги сохранены"
 fi
 
-echo -e "${GREEN}Бэкап создан в: $BACKUP_DIR${NC}"
+echo -e "${{GREEN}}Бэкап создан в: $BACKUP_DIR${{NC}}"
 echo ""
 
 # Установка новых конфигов
-echo -e "${YELLOW}[2/5] Установка конфигов Hyprland...${NC}"
+echo -e "${{YELLOW}}[2/5] Установка конфигов Hyprland...${{NC}}"
 mkdir -p "$HOME/.config/hypr"
 cp "$SCRIPT_DIR/hyprland.conf" "$HOME/.config/hypr/hyprland.conf"
 echo "  ✓ Hyprland конфиг установлен"
 
-echo -e "${YELLOW}[3/5] Установка конфигов Waybar...${NC}"
+echo -e "${{YELLOW}}[3/5] Установка конфигов Waybar...${NC}"
 mkdir -p "$HOME/.config/waybar"
 cp "$SCRIPT_DIR/waybar_config.json" "$HOME/.config/waybar/config"
 cp "$SCRIPT_DIR/waybar_style.css" "$HOME/.config/waybar/style.css"
 echo "  ✓ Waybar конфиги установлены"
 
-echo -e "${YELLOW}[4/6] Установка конфигов Wofi...${NC}"
+echo -e "${{YELLOW}}[4/6] Установка конфигов Wofi...${NC}"
 mkdir -p "$HOME/.config/wofi"
 cp "$SCRIPT_DIR/wofi_config" "$HOME/.config/wofi/config"
 cp "$SCRIPT_DIR/wofi_style.css" "$HOME/.config/wofi/style.css"
 echo "  ✓ Wofi конфиги установлены"
 
-echo -e "${YELLOW}[5/6] Установка конфигов Kitty...${NC}"
+echo -e "${{YELLOW}}[5/6] Установка конфигов Kitty...${NC}"
 mkdir -p "$HOME/.config/kitty"
 cp "$SCRIPT_DIR/kitty.conf" "$HOME/.config/kitty/kitty.conf"
 echo "  ✓ Kitty конфиг установлен"
 
-if [ -f "$SCRIPT_DIR/wallpaper.png" ]; then
-    echo -e "${YELLOW}[5.5/6] Установка обоев...${NC}"
-    mkdir -p "$HOME/.config/hypr"
-    cp "$SCRIPT_DIR/wallpaper.png" "$HOME/.config/hypr/wallpaper.png"
-    
-    # Настройка hyprpaper
-    cat > "$HOME/.config/hypr/hyprpaper.conf" << EOF
-preload = $HOME/.config/hypr/wallpaper.png
-wallpaper = ,$HOME/.config/hypr/wallpaper.png
-EOF
-    echo "  ✓ Обои и конфиг hyprpaper установлены"
-fi
+{wallpaper_install}
 
-echo -e "${YELLOW}[6/6] Применение изменений...${NC}"
+echo -e "${{YELLOW}}[6/6] Применение изменений...${NC}"
 
 # Перезагрузка Waybar
 if pgrep -x "waybar" > /dev/null; then
@@ -322,16 +347,6 @@ fi
 waybar &
 echo "  ✓ Waybar перезапущен"
 
-# Запуск/перезапуск hyprpaper
-if [ -f "$HOME/.config/hypr/hyprpaper.conf" ]; then
-    if pgrep -x "hyprpaper" > /dev/null; then
-        killall hyprpaper
-        sleep 1
-    fi
-    hyprpaper &
-    echo "  ✓ hyprpaper запущен"
-fi
-
 # Перезагрузка Kitty (требует перезапуска терминала)
 echo "  ℹ Kitty: закройте все окна Kitty и откройте заново для применения"
 
@@ -339,7 +354,7 @@ echo "  ℹ Kitty: закройте все окна Kitty и откройте з
 echo "  ✓ Hyprland: конфиги применятся автоматически"
 
 echo ""
-echo -e "${GREEN}=== Установка завершена! ===${NC}"
+echo -e "${{GREEN}}=== Установка завершена! ===${NC}"
 echo ""
 echo "Для отката изменений используйте:"
 echo "  $BACKUP_DIR/restore.sh"
