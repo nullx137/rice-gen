@@ -318,26 +318,26 @@ mkdir -p "$HOME/.config/hypr"
 cp "$SCRIPT_DIR/hyprland.conf" "$HOME/.config/hypr/hyprland.conf"
 echo "  ✓ Hyprland конфиг установлен"
 
-echo -e "${{YELLOW}}[3/5] Установка конфигов Waybar...${NC}"
+echo -e "${{YELLOW}}[3/5] Установка конфигов Waybar...${{NC}}"
 mkdir -p "$HOME/.config/waybar"
 cp "$SCRIPT_DIR/waybar_config.json" "$HOME/.config/waybar/config"
 cp "$SCRIPT_DIR/waybar_style.css" "$HOME/.config/waybar/style.css"
 echo "  ✓ Waybar конфиги установлены"
 
-echo -e "${{YELLOW}}[4/6] Установка конфигов Wofi...${NC}"
+echo -e "${{YELLOW}}[4/6] Установка конфигов Wofi...${{NC}}"
 mkdir -p "$HOME/.config/wofi"
 cp "$SCRIPT_DIR/wofi_config" "$HOME/.config/wofi/config"
 cp "$SCRIPT_DIR/wofi_style.css" "$HOME/.config/wofi/style.css"
 echo "  ✓ Wofi конфиги установлены"
 
-echo -e "${{YELLOW}}[5/6] Установка конфигов Kitty...${NC}"
+echo -e "${{YELLOW}}[5/6] Установка конфигов Kitty...${{NC}}"
 mkdir -p "$HOME/.config/kitty"
 cp "$SCRIPT_DIR/kitty.conf" "$HOME/.config/kitty/kitty.conf"
 echo "  ✓ Kitty конфиг установлен"
 
 {wallpaper_install}
 
-echo -e "${{YELLOW}}[6/6] Применение изменений...${NC}"
+echo -e "${{YELLOW}}[6/6] Применение изменений...${{NC}}"
 
 # Перезагрузка Waybar
 if pgrep -x "waybar" > /dev/null; then
@@ -354,7 +354,7 @@ echo "  ℹ Kitty: закройте все окна Kitty и откройте з
 echo "  ✓ Hyprland: конфиги применятся автоматически"
 
 echo ""
-echo -e "${{GREEN}}=== Установка завершена! ===${NC}"
+echo -e "${{GREEN}}=== Установка завершена! ===${{NC}}"
 echo ""
 echo "Для отката изменений используйте:"
 echo "  $BACKUP_DIR/restore.sh"
