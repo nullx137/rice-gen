@@ -3,6 +3,7 @@
 import json
 import re
 import httpx
+import base64
 from pathlib import Path
 from typing import Optional
 
@@ -187,7 +188,57 @@ Return ONLY the prompt text in English, no intro, no quotes."""
 
         print(f"🎨 Промпт для обоев: {image_prompt[:60]}...")
         
-        # 2. Генерируем изображение через wallpaper_model
+        # 2. Генерируем изображение
+        if self.provider == "cometapi":
+            print(f"🚀 Запрос к CometAPI для генерации изображения ({self.wallpaper_model})...")
+            url = f"https://api.cometapi.com/v1beta/models/{self.wallpaper_model}:generateContent"
+            headers = {
+                "Authorization": self.api_key,
+                "Content-Type": "application/json"
+            }
+            payload = {
+                "contents": [
+                    {
+                        "role": "user",
+                        "parts": [{"text": image_prompt}]
+                    }
+                ],
+                "generationConfig": {
+                    "responseModalities": ["IMAGE"],
+                    "imageConfig": {
+                        "aspectRatio": "16:9"
+                    }
+                }
+            }
+            
+            try:
+                with httpx.Client(timeout=120.0) as http_client:
+                    response = http_client.post(url, headers=headers, json=payload)
+                    response.raise_for_status()
+                    data = response.json()
+                    
+                    parts = data.get('candidates', [{}])[0].get('content', {}).get('parts', [])
+                    for part in parts:
+                        if 'inlineData' in part:
+                            img_data = base64.b64decode(part['inlineData']['data'])
+                            Path(output_path).write_bytes(img_data)
+                            print(f"✅ Обои сохранены (inlineData): {output_path}")
+                            return Path(output_path)
+                        elif 'text' in part:
+                            text = part['text']
+                            url_match = re.search(r'(https?://\S+)', text)
+                            if url_match:
+                                image_url = url_match.group(1).strip('()[]"\'')
+                                print(f"📥 Загрузка изображения по ссылке из CometAPI: {image_url}")
+                                img_res = http_client.get(image_url)
+                                img_res.raise_for_status()
+                                Path(output_path).write_bytes(img_res.content)
+                                print(f"✅ Обои сохранены: {output_path}")
+                                return Path(output_path)
+            except Exception as e:
+                print(f"⚠️ Ошибка CometAPI (пробуем стандартный метод): {e}")
+
+        # 3. Стандартный метод (OpenRouter или запасной для CometAPI)
         with OpenRouterClient(self.api_key, self.wallpaper_model, self.provider) as client:
             gen_prompt = f"Generate a high-quality 4k wallpaper based on this description: {image_prompt}. Return ONLY the direct URL to the image."
             
