@@ -173,12 +173,11 @@ class SeparateGenerator:
         Returns:
             Путь к сохраненному файлу обоев.
         """
-        # 1. Генерируем промпт для картинки
-        analysis_prompt = """Проанализируй этот скриншот рабочего стола Linux. 
-Составь подробный промпт для ИИ-генератора изображений (например, Flux или DALL-E), 
-чтобы создать идеальные абстрактные обои (4k), которые будут сочетаться с этим интерфейсом по цветам и настроению.
-
-Верни ТОЛЬКО текст промпта на английском языке, без вводных слов и кавычек."""
+        # 1. Генерируем промпт для картинки на основе скриншота
+        analysis_prompt = """Analyze this Linux desktop screenshot. 
+Create a detailed prompt for an AI image generator (like Flux or DALL-E) 
+to create perfect abstract 4k wallpaper that matches this interface's colors and mood.
+Return ONLY the prompt text in English, no intro, no quotes."""
 
         with OpenRouterClient(self.api_key, self.model, self.provider) as client:
             image_prompt = client.analyze_image_with_prompt(
@@ -186,34 +185,53 @@ class SeparateGenerator:
                 prompt=analysis_prompt
             ).strip()
 
-        print(f"🎨 Генерация обоев по промпту: {image_prompt[:50]}...")
+        print(f"🎨 Промпт для обоев: {image_prompt[:60]}...")
         
-        # 2. Генерируем изображение
-        # Используем OpenRouterClient для отправки запроса к модели генерации изображений
+        # 2. Генерируем изображение через wallpaper_model
         with OpenRouterClient(self.api_key, self.wallpaper_model, self.provider) as client:
-            # Для генерации изображений через текстовые модели (которые возвращают URL)
-            # или специализированные модели генерации
-            gen_prompt = f"Generate a high-quality 4k wallpaper based on this description: {image_prompt}. Return only the direct URL to the image."
+            gen_prompt = f"Generate a high-quality 4k wallpaper based on this description: {image_prompt}. Return ONLY the direct URL to the image."
             
-            response_text = client.analyze_image_with_prompt(
-                screenshot_path=screenshot_path, # Передаем скриншот как контекст, если модель мультимодальная
-                prompt=gen_prompt
-            )
+            try:
+                response_text = client.analyze_image_with_prompt(
+                    screenshot_path=screenshot_path,
+                    prompt=gen_prompt
+                )
+            except Exception as e:
+                print(f"❌ Ошибка API при генерации обоев: {e}")
+                return Path(output_path)
             
-            # Пытаемся найти URL в ответе (может быть в markdown или просто текстом)
-            url_match = re.search(r'(https?://\S+)', response_text)
-            if url_match:
-                image_url = url_match.group(1).strip('()[]"\'')
-                print(f"📥 Скачивание обоев: {image_url}")
-                
-                img_response = httpx.get(image_url)
-                img_response.raise_for_status()
-                Path(output_path).write_bytes(img_response.content)
+            # Извлечение URL из ответа
+            image_url = None
+            
+            # Пробуем найти URL в JSON (если модель вернула JSON)
+            try:
+                data = json.loads(response_text)
+                if isinstance(data, dict):
+                    image_url = data.get("url") or data.get("image_url")
+            except:
+                pass
+            
+            # Пробуем найти URL через регулярку (включая markdown)
+            if not image_url:
+                url_match = re.search(r'(https?://\S+)', response_text)
+                if url_match:
+                    image_url = url_match.group(1).strip('()[]"\'')
+
+            if image_url:
+                print(f"📥 Загрузка изображения: {image_url}")
+                try:
+                    with httpx.Client(follow_redirects=True, timeout=60.0) as http_client:
+                        img_response = http_client.get(image_url)
+                        img_response.raise_for_status()
+                        Path(output_path).write_bytes(img_response.content)
+                        print(f"✅ Обои сохранены: {output_path}")
+                except Exception as e:
+                    print(f"❌ Ошибка при скачивании изображения: {e}")
             else:
-                # Если URL не найден, возможно модель вернула ошибку или текст
-                print(f"⚠️ Не удалось найти URL в ответе: {response_text[:100]}...")
-                # В качестве запасного варианта сохраняем текст ответа
-                Path(output_path).write_text(response_text)
+                print(f"⚠️ URL не найден в ответе. Ответ модели: {response_text[:200]}")
+                # Сохраняем текст ответа для отладки, если это не бинарные данные
+                if len(response_text) < 1000:
+                    Path(output_path).with_suffix('.txt').write_text(response_text)
             
         return Path(output_path)
 
