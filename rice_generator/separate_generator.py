@@ -322,7 +322,7 @@ class SeparateGenerator:
 - layer: "top" или "bottom"
 - position: "top" или "bottom"
 - height: высота бара (обычно 30-40)
-- modules-left: [спивое модулей слева]
+- modules-left: [список модулей слева]
 - modules-center: [список модулей по центру]
 - modules-right: [список модулей справа]
 - Настройки каждого модуля
