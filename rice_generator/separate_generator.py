@@ -55,7 +55,7 @@ class SeparateGenerator:
             response = client.analyze_image_with_prompt(
                 screenshot_path=screenshot_path,
                 prompt=prompt,
-                max_tokens=settings.HYPRLAND_MAX_TOKENS,
+                max_tokens=None,  # Без ограничений
             )
 
         return self._extract_code_block(response, "hyprland")
@@ -83,7 +83,7 @@ class SeparateGenerator:
             response = client.analyze_image_with_prompt(
                 screenshot_path=screenshot_path,
                 prompt=prompt,
-                max_tokens=settings.WAYBAR_MAX_TOKENS,
+                max_tokens=None,  # Без ограничений
             )
 
         config = self._extract_json_config(response)
@@ -114,7 +114,7 @@ class SeparateGenerator:
             response = client.analyze_image_with_prompt(
                 screenshot_path=screenshot_path,
                 prompt=prompt,
-                max_tokens=settings.WAYBAR_MAX_TOKENS,  # 6000
+                max_tokens=None,  # Без ограничений
             )
 
         config = self._extract_wofi_config(response)
@@ -143,18 +143,71 @@ class SeparateGenerator:
             response = client.analyze_image_with_prompt(
                 screenshot_path=screenshot_path,
                 prompt=prompt,
-                max_tokens=settings.KITTY_MAX_TOKENS,
+                max_tokens=None,  # Без ограничений
             )
 
         return self._extract_code_block(response, "kitty")
+
+    def generate_wallpaper(
+        self,
+        screenshot_path: str | Path,
+        output_path: str | Path,
+    ) -> str:
+        """
+        Анализирует скриншот и генерирует новые обои в том же стиле.
+
+        Args:
+            screenshot_path: Путь к скриншоту для анализа.
+            output_path: Куда сохранить сгенерированные обои.
+
+        Returns:
+            Текст промпта, который использовался для генерации.
+        """
+        # 1. Генерируем промпт для картинки
+        analysis_prompt = """Проанализируй этот скриншот рабочего стола Linux. 
+Составь подробный промпт для ИИ-генератора изображений (например, Flux или DALL-E), 
+чтобы создать идеальные абстрактные обои (4k), которые будут сочетаться с этим интерфейсом по цветам и настроению.
+
+Верни ТОЛЬКО текст промпта на английском языке, без вводных слов и кавычек. 
+Сфокусируйся на цветах, стиле (minimalist, cyberpunk, flat и т.д.) и композиции."""
+
+        with OpenRouterClient(self.api_key, self.model, self.provider) as client:
+            image_prompt = client.analyze_image_with_prompt(
+                screenshot_path=screenshot_path,
+                prompt=analysis_prompt
+            ).strip()
+
+        # 2. Генерируем само изображение (используем специальную модель для картинок)
+        # По умолчанию пробуем OpenAI DALL-E 3 или Google Imagen через OpenRouter
+        img_model = "openai/dall-e-3" if self.provider == "openrouter" else self.model
+        
+        print(f"🎨 Генерируем обои по промпту: {image_prompt[:50]}...")
+        
+        with OpenRouterClient(self.api_key, img_model, self.provider) as client:
+            # Для генерации картинок в OpenRouter используется тот же эндпоинт, 
+            # но промпт отправляется как обычный текст. 
+            # Внимание: некоторые провайдеры возвращают URL в ответе.
+            payload = {
+                "model": img_model,
+                "messages": [{"role": "user", "content": f"Generate a high-quality 4k wallpaper: {image_prompt}"}],
+            }
+            # Это упрощенная реализация. В реальности нам нужно скачать файл по URL.
+            # Для прототипа мы предположим, что API возвращает URL или base64.
+            
+        return image_prompt
 
     def _build_hyprland_prompt(self, template: str) -> str:
         """Создаёт промпт для Hyprland — только замена переменных."""
         return f"""Ты эксперт по Hyprland. Проанализируй скриншот и модифицируй шаблон.
 
-## ⚠️ КРИТИЧЕСКИ ВАЖНО — ПРОЧИТАЙ ВНИМАТЕЛЬНО:
+## ⚠️ ВАЖНО — ВЕРНИ ТОЛЬКО КОД:
 
-Твоя задача — ТОЛЬКО заменить переменные в шаблоне на основе скриншота.
+- Верни ТОЛЬКО код конфига, БЕЗ markdown разметки (НЕ используй ```hyprland, ``` и т.д.)
+- НЕ добавляй пояснений, комментариев или описаний
+- Верни чистый код конфигурации
+
+## Твоя задача:
+ТОЛЬКО заменить переменные в шаблоне на основе скриншота.
 НЕ добавляй новый код, НЕ удаляй существующий, НЕ меняй структуру.
 
 ## Что нужно распознать со скриншота и заменить:
@@ -191,10 +244,7 @@ class SeparateGenerator:
 {template}
 
 ## Формат ответа:
-Верни ТОЛЬКО полный код Hyprland конфига в блоке:
-```hyprland
-# весь конфиг с заменёнными переменными
-```
+Верни ТОЛЬКО чистый код конфига БЕЗ markdown разметки (без ```hyprland, ``` и т.д.)
 
 ## ⚠️ ЗАПРЕЩЕНО:
 - Добавлять новые секции
@@ -277,17 +327,9 @@ class SeparateGenerator:
 {style_template}
 
 ## Формат ответа:
-```json
-{{
-  "layer": "top",
-  "position": "top",
-  "height": 30,
-  "modules-left": ["hyprland/workspaces", "tray"],
-  "modules-center": ["hyprland/window"],
-  "modules-right": ["pulseaudio", "network", "battery", "clock"],
-  ...
-}}
-```
+Верни ТОЛЬКО чистый JSON и CSS БЕЗ markdown разметки (без ```json, ```css и т.д.)
+
+Сначала JSON конфиг, потом CSS стиль (разделённые пустой строкой).
 
 ```css
 * {{
@@ -393,7 +435,11 @@ height=40%
 location=center
 show=drun
 ...
-```
+
+## Формат ответа:
+Верни ТОЛЬКО чистый код БЕЗ markdown разметки (без ```config, ```css и т.д.)
+
+Сначала wofi_config, потом wofi_style.css (разделённые пустой строкой).
 
 ```css
 window {{

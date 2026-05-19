@@ -21,6 +21,7 @@ class GeneratedConfig:
     fonts: dict
     gaps: dict
     notes: str
+    wallpaper_path: Optional[Path] = None
 
 
 class ConfigParser:
@@ -298,6 +299,19 @@ mkdir -p "$HOME/.config/kitty"
 cp "$SCRIPT_DIR/kitty.conf" "$HOME/.config/kitty/kitty.conf"
 echo "  ✓ Kitty конфиг установлен"
 
+if [ -f "$SCRIPT_DIR/wallpaper.png" ]; then
+    echo -e "${YELLOW}[5.5/6] Установка обоев...${NC}"
+    mkdir -p "$HOME/.config/hypr"
+    cp "$SCRIPT_DIR/wallpaper.png" "$HOME/.config/hypr/wallpaper.png"
+    
+    # Настройка hyprpaper
+    cat > "$HOME/.config/hypr/hyprpaper.conf" << EOF
+preload = $HOME/.config/hypr/wallpaper.png
+wallpaper = ,$HOME/.config/hypr/wallpaper.png
+EOF
+    echo "  ✓ Обои и конфиг hyprpaper установлены"
+fi
+
 echo -e "${YELLOW}[6/6] Применение изменений...${NC}"
 
 # Перезагрузка Waybar
@@ -307,6 +321,16 @@ if pgrep -x "waybar" > /dev/null; then
 fi
 waybar &
 echo "  ✓ Waybar перезапущен"
+
+# Запуск/перезапуск hyprpaper
+if [ -f "$HOME/.config/hypr/hyprpaper.conf" ]; then
+    if pgrep -x "hyprpaper" > /dev/null; then
+        killall hyprpaper
+        sleep 1
+    fi
+    hyprpaper &
+    echo "  ✓ hyprpaper запущен"
+fi
 
 # Перезагрузка Kitty (требует перезапуска терминала)
 echo "  ℹ Kitty: закройте все окна Kitty и откройте заново для применения"
