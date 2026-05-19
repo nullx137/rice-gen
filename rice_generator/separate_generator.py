@@ -37,6 +37,13 @@ class SeparateGenerator:
         self.model = model or settings.MODEL
         self.wallpaper_model = wallpaper_model or settings.WALLPAPER_MODEL
 
+    def load_template(self, template_name: str) -> str:
+        """Загружает шаблон из директории templates."""
+        template_path = Path(__file__).parent / "templates" / template_name
+        if template_path.exists():
+            return template_path.read_text()
+        return ""
+
     def generate_hyprland(
         self,
         screenshot_path: str | Path,
@@ -182,30 +189,31 @@ class SeparateGenerator:
         print(f"🎨 Генерация обоев по промпту: {image_prompt[:50]}...")
         
         # 2. Генерируем изображение
-        # Используем выбранного провайдера (OpenRouter или CometAPI)
+        # Используем OpenRouterClient для отправки запроса к модели генерации изображений
         with OpenRouterClient(self.api_key, self.wallpaper_model, self.provider) as client:
-            payload = {
-                "model": self.wallpaper_model,
-                "messages": [{"role": "user", "content": f"Generate a high-quality 4k wallpaper: {image_prompt}"}],
-            }
+            # Для генерации изображений через текстовые модели (которые возвращают URL)
+            # или специализированные модели генерации
+            gen_prompt = f"Generate a high-quality 4k wallpaper based on this description: {image_prompt}. Return only the direct URL to the image."
             
-            # Отправляем запрос через настроенный клиент провайдера
-            response = client.client.post("/chat/completions", json=payload)
-            response.raise_for_status()
-            data = response.json()
+            response_text = client.analyze_image_with_prompt(
+                screenshot_path=screenshot_path, # Передаем скриншот как контекст, если модель мультимодальная
+                prompt=gen_prompt
+            )
             
-            # Пытаемся извлечь URL изображения из ответа
-            # Большинство провайдеров возвращают URL в контенте сообщения или в поле url
-            image_url = data.get("choices", [{}])[0].get("message", {}).get("content", "")
-            
-            # Если API вернуло URL, скачиваем его
-            if image_url.startswith("http"):
+            # Пытаемся найти URL в ответе (может быть в markdown или просто текстом)
+            url_match = re.search(r'(https?://\S+)', response_text)
+            if url_match:
+                image_url = url_match.group(1).strip('()[]"\'')
+                print(f"📥 Скачивание обоев: {image_url}")
+                
                 img_response = httpx.get(image_url)
                 img_response.raise_for_status()
-                output_path.write_bytes(img_response.content)
+                Path(output_path).write_bytes(img_response.content)
             else:
-                # Если API вернуло base64 или другой формат, сохраняем как текст (или нужно декодировать)
-                output_path.write_text(image_url)
+                # Если URL не найден, возможно модель вернула ошибку или текст
+                print(f"⚠️ Не удалось найти URL в ответе: {response_text[:100]}...")
+                # В качестве запасного варианта сохраняем текст ответа
+                Path(output_path).write_text(response_text)
             
         return Path(output_path)
 
