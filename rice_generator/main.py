@@ -4,6 +4,7 @@ import json
 import sys
 import time
 from pathlib import Path
+from typing import Optional
 
 from .openrouter_client import OpenRouterClient
 from .config_parser import ConfigParser, ConfigGenerator
@@ -103,7 +104,10 @@ class RiceGenerator:
         hyprland_config: str | Path | None = None,
         provider: str | None = None,
         wallpaper_model: str | None = None,
+<<<<<<< HEAD
         wallpaper_enabled: bool = True,
+=======
+>>>>>>> 19bba975c3ba1563a80f2431b927745f39e0d1e4
     ):
         """
         Инициализация генератора.
@@ -113,19 +117,26 @@ class RiceGenerator:
             templates_dir: Директория с шаблонами.
             model: Модель для анализа (по умолчанию из конфига).
             separate: Использовать раздельные запросы (рекомендуется).
-            hyprland_config: Путь к пользовательскому hyprland.conf (по умолчанию: встроенный шаблон).
+            hyprland_config: Путь к пользовательскому hyprland.conf.
             provider: API провайдер (openrouter или cometapi).
+<<<<<<< HEAD
             wallpaper_model: Модель для генерации обоев (по умолчанию из конфига).
             wallpaper_enabled: Включить генерацию обоев.
+=======
+            wallpaper_model: Модель для генерации обоев.
+>>>>>>> 19bba975c3ba1563a80f2431b927745f39e0d1e4
         """
         self.api_key = api_key
         self.templates_dir = Path(templates_dir) if templates_dir else None
-        self.model = model
+        self.model = model or settings.MODEL
         self.separate = separate
         self.hyprland_config = Path(hyprland_config) if hyprland_config else None
         self.provider = provider or settings.API_PROVIDER
         self.wallpaper_model = wallpaper_model or settings.WALLPAPER_MODEL
+<<<<<<< HEAD
         self.wallpaper_enabled = wallpaper_enabled
+=======
+>>>>>>> 19bba975c3ba1563a80f2431b927745f39e0d1e4
 
         if self.templates_dir is None:
             self.templates_dir = Path(__file__).parent / "templates"
@@ -152,7 +163,6 @@ class RiceGenerator:
             raise FileNotFoundError(f"Скриншот не найден: {screenshot_path}")
 
         # Загрузка шаблонов
-        # Используем пользовательский hyprland.conf или встроенный шаблон
         if self.hyprland_config and self.hyprland_config.exists():
             print(f"📄 Используем ваш hyprland.conf: {self.hyprland_config}")
             hyprland_template = self.hyprland_config.read_text()
@@ -167,11 +177,17 @@ class RiceGenerator:
 
         if self.separate:
             print("📸 Анализ скриншота...")
-            print(f"🤖 Модель: {self.model or settings.MODEL}")
+            print(f"🤖 Модель анализа: {self.model}")
+            print(f"🎨 Модель обоев: {self.wallpaper_model}")
             print("=" * 40)
 
             # Используем раздельные запросы
-            generator = SeparateGenerator(self.api_key, self.model, self.provider)
+            generator = SeparateGenerator(
+                self.api_key, 
+                self.model, 
+                self.provider,
+                wallpaper_model=self.wallpaper_model
+            )
 
             # 1. Генерация Hyprland
             spinner.start("Генерация Hyprland...", BLUE)
@@ -238,6 +254,7 @@ class RiceGenerator:
                 spinner.stop(success=False)
                 raise
 
+<<<<<<< HEAD
             # 5. Генерация обоев (опционально, отдельная модель)
             wallpaper_bytes: bytes | None = None
             if self.wallpaper_enabled:
@@ -260,6 +277,21 @@ class RiceGenerator:
                     spinner.stop(success=False)
                     print(f"{RED}⚠ Ошибка генерации обоев: {e}{RESET}")
                     wallpaper_bytes = None
+=======
+            # 5. Генерация обоев
+            output_dir.mkdir(parents=True, exist_ok=True)
+            wallpaper_path = output_dir / "wallpaper.png"
+            spinner.start("Генерация обоев...", CYAN)
+            try:
+                generator.generate_wallpaper(
+                    screenshot_path=screenshot_path,
+                    output_path=wallpaper_path,
+                )
+                spinner.stop(success=True)
+            except Exception:
+                spinner.stop(success=False)
+                wallpaper_path = None
+>>>>>>> 19bba975c3ba1563a80f2431b927745f39e0d1e4
 
             print("=" * 40)
             print("📝 Обработка результатов...")
@@ -278,16 +310,13 @@ class RiceGenerator:
                 fonts={},
                 gaps={},
                 notes="Сгенерировано с раздельными запросами",
+                wallpaper_path=wallpaper_path,
             )
         else:
+            # Старый метод (единый запрос)
             print("📸 Анализ скриншота...")
-            print(f"🤖 Модель: {self.model or settings.MODEL}")
-            print("🤖 Отправка запроса к нейросети...")
-
-            # Загрузка шаблона Hyprland для старого метода
-            hyprland_template = (self.templates_dir / "hyprland.conf").read_text()
-
-            # Анализ скриншота через API (старый метод)
+            print(f"🤖 Модель: {self.model}")
+            
             with OpenRouterClient(self.api_key, self.model, self.provider) as client:
                 response = client.analyze_screenshot(
                     screenshot_path=screenshot_path,
@@ -297,8 +326,6 @@ class RiceGenerator:
                 )
 
             print("📝 Обработка ответа...")
-
-            # Парсинг ответа
             parser = ConfigParser(response)
             config = parser.parse()
             wallpaper_bytes = None
@@ -311,42 +338,3 @@ class RiceGenerator:
         print(f"📄 Файлов создано: {len(paths)}")
 
         return paths
-
-    def _get_waybar_style_template(self) -> str:
-        """Возвращает шаблон style.css для Waybar."""
-        style_path = self.templates_dir / "waybar_style.css"
-        if style_path.exists():
-            return style_path.read_text()
-
-        # Шаблон по умолчанию
-        return """* {
-    font-family: "JetBrainsMono Nerd Font";
-    font-size: 14px;
-    min-height: 30px;
-}
-
-window#waybar {
-    background: rgba(30, 30, 46, 0.9);
-    color: #c0caf5;
-}
-
-#workspaces {
-    background: #1a1b26;
-}
-
-#workspaces button {
-    padding: 0 10px;
-    color: #c0caf5;
-}
-
-#workspaces button.active {
-    background: #7aa2f7;
-    color: #1a1b26;
-}
-
-#clock {
-    background: #7aa2f7;
-    color: #1a1b26;
-    padding: 0 10px;
-}
-"""

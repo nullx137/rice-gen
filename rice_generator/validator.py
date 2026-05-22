@@ -119,6 +119,14 @@ class AIValidator:
         if waybar_style.exists():
             configs["waybar_style"] = waybar_style.read_text(encoding="utf-8")
 
+        wofi_config = output_dir / "wofi_config"
+        if wofi_config.exists():
+            configs["wofi_config"] = wofi_config.read_text(encoding="utf-8")
+
+        wofi_style = output_dir / "wofi_style.css"
+        if wofi_style.exists():
+            configs["wofi_style"] = wofi_style.read_text(encoding="utf-8")
+
         kitty = output_dir / "kitty.conf"
         if kitty.exists():
             configs["kitty"] = kitty.read_text(encoding="utf-8")
@@ -180,6 +188,7 @@ class AIValidator:
 
         return f"""Ты эксперт по Linux rice. Проверь конфиги на соответствие скриншоту.
 
+<<<<<<< HEAD
 ## ⚠️ КРИТИЧЕСКИ ВАЖНО — ЧТО МОЖНО ПРОВЕРЯТЬ:
 Ты должен проверять ТОЛЬКО визуальные параметры и внешний вид.
 НИКОГДА не создавай замечания, связанные с:
@@ -189,6 +198,10 @@ class AIValidator:
 - путями к скриптам, командам, программам
 - горячими клавишами, раскладками клавиатуры, сенситивити мыши
 - настройками аудио, сети, Bluetooth и т.д.
+=======
+## ГЛАВНАЯ ЗАДАЧА:
+Внимательно рассмотри скриншот и проверь конфиги Waybar и Wofi на наличие и правильное расположение модулей.
+>>>>>>> 19bba975c3ba1563a80f2431b927745f39e0d1e4
 
 ## 🔍 ПРОВЕРКА WAYBAR — МОДУЛИ (ПРИОРИТЕТ #1):
 
@@ -203,30 +216,19 @@ class AIValidator:
 - Какие модули СЛЕВА? (обычно: workspaces, tray)
 - Какие модули ПО ЦЕНТРУ? (обычно: window, media)
 - Какие модули СПРАВА? (обычно: audio, network, battery, clock)
-- Правильный ли порядок?
 
-### 3. Внешний вид модулей:
-- Есть ли иконки у модулей? (🔊, 📶, 🔋, 🕐)
-- Правильный ли формат вывода?
-- Видны ли все модули или какие-то скрыты?
-- Нет ли "квадратов" вместо иконок?
-
-### 4. Структура бара:
-- Цельный бар (сплошная полоса) или раздельный (модули отдельно)?
-- Прозрачный или сплошной фон?
-- Высота бара соответствует скриншоту?
+## 🔍 ПРОВЕРКА WOFI (если есть):
+- Соответствуют ли цвета фона и текста скриншоту?
+- Правильный ли размер окна (width, height)?
+- Есть ли иконки (allow_images)?
 
 ## 📝 ПРОВЕРКА ДРУГИХ КОНФИГОВ (ТОЛЬКО ВИЗУАЛЬНЫЕ ПАРАМЕТРЫ):
 
 ### Hyprland — можно проверять:
 - gaps_in / gaps_out — отступы
 - col.active_border — цвет активной рамки
-- col.inactive_border — цвет неактивной рамки
 - rounding — скругления углов
 - active_opacity / inactive_opacity — прозрачность
-- border_size — толщина рамок
-- shadow.enabled, shadow.range — тени
-- blur.enabled, blur.size — блюр
 
 ### Hyprland — НЕЛЬЗЯ проверять и предлагать изменять:
 - binds (любые горячие клавиши)
@@ -237,8 +239,8 @@ class AIValidator:
 
 ### Kitty — можно проверять:
 - foreground / background — цвета
-- color0-15 — палитра
 - font_family / font_size — шрифт
+<<<<<<< HEAD
 - window_padding_width — отступы
 - cursor / cursor_text_color
 
@@ -249,6 +251,8 @@ class AIValidator:
 - enable_audio_bell
 - map (горячие клавиши)
 - любые другие функциональные параметры
+=======
+>>>>>>> 19bba975c3ba1563a80f2431b927745f39e0d1e4
 
 ## Конфигурационные файлы:
 {configs_text}
@@ -260,24 +264,18 @@ class AIValidator:
   "issues": [
     {{
       "file": "waybar_config",
-      "description": "Отсутствует модуль clock в modules-right — на скриншоте видно часы справа",
+      "description": "Отсутствует модуль clock в modules-right",
       "severity": "error",
       "suggestion": "Добавь 'custom/clock' в modules-right"
     }},
     {{
-      "file": "waybar_config",
-      "description": "Модуль battery есть в конфиге, но на скриншоте его нет",
+      "file": "wofi_style",
+      "description": "Цвет фона слишком темный",
       "severity": "warning",
-      "suggestion": "Удали 'battery' из modules-right"
-    }},
-    {{
-      "file": "hyprland",
-      "description": "gaps_in = 5, но на скриншоте отступы больше (~10)",
-      "severity": "error",
-      "suggestion": "Измени gaps_in на 10"
+      "suggestion": "Измени background-color на #..."
     }}
   ],
-  "summary": "Найдено 3 замечания"
+  "summary": "Найдено X замечаний"
 }}
 ```
 """
@@ -343,6 +341,8 @@ class AIValidator:
   "hyprland": "# исправленный конфиг hyprland",
   "waybar_config": "{{ ... }}",
   "waybar_style": "/* исправленный CSS */",
+  "wofi_config": "mode=drun...",
+  "wofi_style": "/* исправленный CSS */",
   "kitty": "# исправленный конфиг kitty"
 }}
 ```
@@ -351,18 +351,40 @@ class AIValidator:
 """
 
     def _extract_analysis_json(self, text: str) -> dict:
-        """Извлекает JSON с анализом из ответа."""
+        """Извлекает JSON с анализом из ответа ИИ."""
         if not text:
             return {"issues": [], "summary": "Пустой ответ от ИИ"}
 
-        match = re.search(r"```(?:json)?\s*({.*?})\s*```", text, re.DOTALL)
-        if match:
+        # Strategy 1: Extract from markdown code blocks
+        patterns = [
+            r"```json\s*(.*?)\s*```",
+            r"```\s*(.*?)\s*```",
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, text, re.DOTALL)
+            if match:
+                content = match.group(1).strip()
+                try:
+                    return json.loads(content)
+                except json.JSONDecodeError as e:
+                    if getattr(settings, 'VERBOSE', False):
+                        print(f"   ⚠️  JSON parse error in analysis block: {e}")
+                    continue
+
+        # Strategy 2: Try to parse the whole stripped text
+        stripped = text.strip()
+        if stripped.startswith("{") and stripped.endswith("}"):
             try:
-                return json.loads(match.group(1))
+                return json.loads(stripped)
             except json.JSONDecodeError:
                 pass
 
-        # Пробуем найти JSON без блока
+        # Strategy 3: Find balanced JSON by brace depth
+        data = self._extract_json_by_braces(text)
+        if data and isinstance(data, dict):
+            return data
+
+        # Strategy 4: Try the old simple regex as last resort
         match = re.search(r"\{.*\}", text, re.DOTALL)
         if match:
             try:
@@ -370,26 +392,114 @@ class AIValidator:
             except json.JSONDecodeError:
                 pass
 
+        preview = text[:200].replace('\n', ' ')
+        print(f"   ⚠️  Не удалось извлечь JSON анализа (preview: {preview}...)")
         return {"issues": [], "summary": "Не удалось проанализировать"}
 
     def _extract_fixed_configs(self, text: str) -> dict[str, str]:
-        """Извлекает исправленные конфиги из ответа."""
+        """Извлекает исправленные конфиги из ответа ИИ."""
         if not text:
+            print("   ⚠️  Пустой ответ от ИИ (извлечение конфигов)")
             return {}
 
-        match = re.search(r"```(?:json)?\s*({.*?})\s*```", text, re.DOTALL)
-        if match:
+        allowed_keys = ["hyprland", "waybar_config", "waybar_style", "wofi_config", "wofi_style", "kitty"]
+
+        # Strategy 1: Extract full content from markdown code blocks
+        # First try ```json ... ``` then ``` ... ```
+        patterns = [
+            r"```json\s*(.*?)\s*```",
+            r"```\s*(.*?)\s*```",
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, text, re.DOTALL)
+            if match:
+                content = match.group(1).strip()
+                try:
+                    data = json.loads(content)
+                    return {k: v for k, v in data.items() if k in allowed_keys}
+                except json.JSONDecodeError as e:
+                    if getattr(settings, 'VERBOSE', False):
+                        print(f"   ⚠️  JSON parse error in code block: {e}")
+                    continue
+
+        # Strategy 2: Try to parse the whole stripped text as JSON
+        stripped = text.strip()
+        if stripped.startswith("{") and stripped.endswith("}"):
             try:
-                data = json.loads(match.group(1))
-                return {
-                    key: value
-                    for key, value in data.items()
-                    if key in ["hyprland", "waybar_config", "waybar_style", "kitty"]
-                }
+                data = json.loads(stripped)
+                return {k: v for k, v in data.items() if k in allowed_keys}
             except json.JSONDecodeError:
                 pass
 
+        # Strategy 3: Find balanced JSON object by tracking brace depth
+        data = self._extract_json_by_braces(text)
+        if data and isinstance(data, dict):
+            return {k: v for k, v in data.items() if k in allowed_keys}
+
+        # Strategy 4: Show partial response for debugging
+        preview = text[:200].replace('\n', ' ')
+        print(f"   ⚠️  Не удалось извлечь JSON из ответа ИИ (preview: {preview}...)")
+        if getattr(settings, 'VERBOSE', False):
+            print(f"   DEBUG raw response:\n{text[:1000]}")
         return {}
+
+    def _extract_json_by_braces(self, text: str) -> Optional[dict]:
+        """Извлекает JSON объект из текста, отслеживая баланс скобок."""
+        start = text.find('{')
+        if start == -1:
+            return None
+
+        depth = 0
+        in_string = False
+        escape_next = False
+        end = start
+
+        for i, char in enumerate(text[start:], start):
+            if escape_next:
+                escape_next = False
+                continue
+            if char == '\\' and in_string:
+                escape_next = True
+                continue
+            if char == '"':
+                in_string = not in_string
+                continue
+            if not in_string:
+                if char == '{':
+                    depth += 1
+                elif char == '}':
+                    depth -= 1
+                    if depth == 0:
+                        end = i + 1
+                        break
+
+        if depth == 0:
+            try:
+                return json.loads(text[start:end])
+            except json.JSONDecodeError:
+                # Try simple fixes: remove trailing commas, fix single quotes
+                fixed = self._quick_json_fix(text[start:end])
+                if fixed:
+                    try:
+                        return json.loads(fixed)
+                    except json.JSONDecodeError:
+                        pass
+        return None
+
+    @staticmethod
+    def _quick_json_fix(json_str: str) -> Optional[str]:
+        """Пробует быстро исправить частые ошибки в JSON от ИИ."""
+        # Remove trailing commas before } or ]
+        fixed = re.sub(r',\s*(\}|\])', r'\1', json_str)
+        # Replace unescaped newlines in strings (simple heuristic)
+        # This is a best-effort attempt
+        try:
+            # Test if it parses now
+            json.loads(fixed)
+            return fixed
+        except json.JSONDecodeError:
+            pass
+        return None
 
     def _get_filepath(self, output_dir: Path, file_key: str) -> Optional[Path]:
         """Возвращает путь к файлу по ключу."""
@@ -397,6 +507,8 @@ class AIValidator:
             "hyprland": "hyprland.conf",
             "waybar_config": "waybar_config.json",
             "waybar_style": "waybar_style.css",
+            "wofi_config": "wofi_config",
+            "wofi_style": "wofi_style.css",
             "kitty": "kitty.conf",
         }
 

@@ -121,11 +121,46 @@ class APIClient:
         data = response.json()
         return data["choices"][0]["message"]["content"]
 
+    def analyze_with_prompt(
+        self,
+        prompt: str,
+        max_tokens: int | None = None,
+    ) -> str:
+        """
+        Отправляет только текстовый промпт (без изображения).
+
+        Args:
+            prompt: Текст промпта.
+            max_tokens: Лимит токенов (None = без ограничений).
+
+        Returns:
+            Ответ нейросети.
+        """
+        payload = {
+            "model": self.model,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                    ],
+                }
+            ],
+        }
+        if max_tokens is not None:
+            payload["max_tokens"] = max_tokens
+
+        response = self.client.post("/chat/completions", json=payload)
+        response.raise_for_status()
+
+        data = response.json()
+        return data["choices"][0]["message"]["content"]
+
     def analyze_image_with_prompt(
         self,
         screenshot_path: str | Path,
         prompt: str,
-        max_tokens: int = 4096,
+        max_tokens: int | None = None,
     ) -> str:
         """
         Отправляет скриншот с кастомным промптом.
@@ -133,7 +168,7 @@ class APIClient:
         Args:
             screenshot_path: Путь к скриншоту.
             prompt: Текст промпта.
-            max_tokens: Лимит токенов.
+            max_tokens: Лимит токенов (None = без ограничений).
 
         Returns:
             Ответ нейросети.
@@ -156,8 +191,9 @@ class APIClient:
                     ],
                 }
             ],
-            "max_tokens": max_tokens,
         }
+        if max_tokens is not None:
+            payload["max_tokens"] = max_tokens
 
         response = self.client.post("/chat/completions", json=payload)
         response.raise_for_status()

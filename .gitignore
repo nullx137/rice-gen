@@ -37,7 +37,7 @@ generated_configs/
 *.log
 *.png
 !source.png
-!result.png
+!result.jpg
 
 # Test files
 my-rice/
@@ -48,3 +48,7 @@ screenshot.png
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.aider*
+
+# Misc
+get-pip.py

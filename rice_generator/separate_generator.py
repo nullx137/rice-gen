@@ -2,7 +2,8 @@
 
 import json
 import re
-import time
+import httpx
+import base64
 from pathlib import Path
 from typing import Optional
 
@@ -18,6 +19,7 @@ class SeparateGenerator:
         api_key: Optional[str] = None,
         model: Optional[str] = None,
         provider: Optional[str] = None,
+        wallpaper_model: Optional[str] = None,
     ):
         """
         Инициализация генератора.
@@ -26,6 +28,7 @@ class SeparateGenerator:
             api_key: API ключ.
             model: Модель для анализа.
             provider: API провайдер (openrouter или cometapi).
+            wallpaper_model: Модель для генерации обоев.
         """
         self.provider = provider or settings.API_PROVIDER
         if self.provider == "cometapi":
@@ -33,6 +36,14 @@ class SeparateGenerator:
         else:
             self.api_key = api_key or settings.OPENROUTER_API_KEY
         self.model = model or settings.MODEL
+        self.wallpaper_model = wallpaper_model or settings.WALLPAPER_MODEL
+
+    def load_template(self, template_name: str) -> str:
+        """Загружает шаблон из директории templates."""
+        template_path = Path(__file__).parent / "templates" / template_name
+        if template_path.exists():
+            return template_path.read_text()
+        return ""
 
     def generate_hyprland(
         self,
@@ -55,7 +66,7 @@ class SeparateGenerator:
             response = client.analyze_image_with_prompt(
                 screenshot_path=screenshot_path,
                 prompt=prompt,
-                max_tokens=settings.HYPRLAND_MAX_TOKENS,
+                max_tokens=None,  # Без ограничений
             )
 
         return self._extract_code_block(response, "hyprland")
@@ -83,7 +94,7 @@ class SeparateGenerator:
             response = client.analyze_image_with_prompt(
                 screenshot_path=screenshot_path,
                 prompt=prompt,
-                max_tokens=settings.WAYBAR_MAX_TOKENS,
+                max_tokens=None,  # Без ограничений
             )
 
         config = self._extract_json_config(response)
@@ -114,7 +125,7 @@ class SeparateGenerator:
             response = client.analyze_image_with_prompt(
                 screenshot_path=screenshot_path,
                 prompt=prompt,
-                max_tokens=settings.WAYBAR_MAX_TOKENS,  # 6000
+                max_tokens=None,  # Без ограничений
             )
 
         config = self._extract_wofi_config(response)
@@ -143,7 +154,7 @@ class SeparateGenerator:
             response = client.analyze_image_with_prompt(
                 screenshot_path=screenshot_path,
                 prompt=prompt,
-                max_tokens=settings.KITTY_MAX_TOKENS,
+                max_tokens=None,  # Без ограничений
             )
 
         return self._extract_code_block(response, "kitty")
@@ -151,6 +162,7 @@ class SeparateGenerator:
     def generate_wallpaper(
         self,
         screenshot_path: str | Path,
+<<<<<<< HEAD
     ) -> bytes:
         """
         Генерирует обои на основе скриншота.
@@ -180,14 +192,167 @@ class SeparateGenerator:
             )
 
         return image_bytes
+=======
+        output_path: str | Path,
+    ) -> Path:
+        """
+        Анализирует скриншот и генерирует новые обои.
+
+        Args:
+            screenshot_path: Путь к скриншоту для анализа.
+            output_path: Куда сохранить сгенерированные обои.
+
+        Returns:
+            Путь к сохраненному файлу обоев.
+        """
+        # 1. Генерируем промпт для картинки на основе скриншота
+        analysis_prompt = """Analyze this Linux desktop screenshot. 
+Create a detailed prompt for an AI image generator (like Flux or DALL-E) 
+to create perfect abstract 4k wallpaper that matches this interface's colors and mood.
+Return ONLY the prompt text in English, no intro, no quotes."""
+
+        with OpenRouterClient(self.api_key, self.model, self.provider) as client:
+            image_prompt = client.analyze_image_with_prompt(
+                screenshot_path=screenshot_path,
+                prompt=analysis_prompt
+            ).strip()
+
+        print(f"🎨 Промпт для обоев: {image_prompt[:60]}...")
+
+        # Убедимся, что директория для сохранения существует
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+
+        # 2. Генерируем изображение
+        if self.provider == "cometapi":
+            print(f"🚀 Запрос к CometAPI для генерации изображения ({self.wallpaper_model})...")
+            url = f"https://api.cometapi.com/v1beta/models/{self.wallpaper_model}:generateContent"
+            headers = {
+                "Authorization": self.api_key,
+                "Content-Type": "application/json"
+            }
+            payload = {
+                "contents": [
+                    {
+                        "role": "user",
+                        "parts": [{"text": image_prompt}]
+                    }
+                ],
+                "generationConfig": {
+                    "responseModalities": ["IMAGE"],
+                    "imageConfig": {
+                        "aspectRatio": "16:9"
+                    }
+                }
+            }
+            
+            try:
+                with httpx.Client(timeout=300.0) as http_client:
+                    response = http_client.post(url, headers=headers, json=payload)
+                    response.raise_for_status()
+                    data = response.json()
+                    
+                    parts = data.get('candidates', [{}])[0].get('content', {}).get('parts', [])
+                    for part in parts:
+                        if 'inlineData' in part:
+                            img_data = base64.b64decode(part['inlineData']['data'])
+                            Path(output_path).write_bytes(img_data)
+                            print(f"✅ Обои сохранены (inlineData): {output_path}")
+                            return Path(output_path)
+                        elif 'text' in part:
+                            text = part['text']
+                            url_match = re.search(r'(https?://\S+)', text)
+                            if url_match:
+                                image_url = url_match.group(1).strip('()[]"\'')
+                                print(f"📥 Загрузка изображения по ссылке из CometAPI: {image_url}")
+                                img_res = http_client.get(image_url)
+                                img_res.raise_for_status()
+                                Path(output_path).write_bytes(img_res.content)
+                                print(f"✅ Обои сохранены: {output_path}")
+                                return Path(output_path)
+            except Exception as e:
+                print(f"⚠️ Ошибка CometAPI (пробуем стандартный метод): {e}")
+
+        # 3. Стандартный метод (OpenRouter или запасной для CometAPI)
+        with OpenRouterClient(self.api_key, self.wallpaper_model, self.provider) as client:
+            gen_prompt = f"Generate a high-quality 4k wallpaper based on this description: {image_prompt}. Return ONLY the direct URL to the image."
+            
+            try:
+                response_text = client.analyze_image_with_prompt(
+                    screenshot_path=screenshot_path,
+                    prompt=gen_prompt
+                )
+            except Exception as e:
+                print(f"❌ Ошибка API при генерации обоев: {e}")
+                return Path(output_path)
+            
+            # Извлечение URL или inline base64 из ответа
+            image_url = None
+            img_data = None
+
+            # Пробуем найти URL в JSON (если модель вернула JSON)
+            try:
+                data = json.loads(response_text)
+                if isinstance(data, dict):
+                    image_url = data.get("url") or data.get("image_url")
+            except Exception:
+                pass
+
+            # Пробуем найти URL через регулярку (включая markdown)
+            if not image_url:
+                url_match = re.search(r'(https?://\S+)', response_text)
+                if url_match:
+                    image_url = url_match.group(1).strip('()[]"\'')
+
+            # Пробуем найти inline base64 (data URI в markdown или тексте)
+            if not image_url:
+                b64_match = re.search(
+                    r'data:image/[^;]+;base64,([A-Za-z0-9+/=]+)',
+                    response_text,
+                )
+                if b64_match:
+                    try:
+                        img_data = base64.b64decode(b64_match.group(1))
+                        print(f"📥 Извлечены inline base64 данные из ответа")
+                    except Exception:
+                        pass
+
+            if img_data:
+                try:
+                    Path(output_path).write_bytes(img_data)
+                    print(f"✅ Обои сохранены: {output_path}")
+                except Exception as e:
+                    print(f"❌ Ошибка при сохранении изображения: {e}")
+            elif image_url:
+                print(f"📥 Загрузка изображения: {image_url}")
+                try:
+                    with httpx.Client(follow_redirects=True, timeout=60.0) as http_client:
+                        img_response = http_client.get(image_url)
+                        img_response.raise_for_status()
+                        Path(output_path).write_bytes(img_response.content)
+                        print(f"✅ Обои сохранены: {output_path}")
+                except Exception as e:
+                    print(f"❌ Ошибка при скачивании изображения: {e}")
+            else:
+                print(f"⚠️ URL не найден в ответе. Ответ модели: {response_text[:200]}")
+                # Сохраняем текст ответа для отладки, если это не бинарные данные
+                if len(response_text) < 1000:
+                    Path(output_path).with_suffix('.txt').write_text(response_text)
+            
+        return Path(output_path)
+>>>>>>> 19bba975c3ba1563a80f2431b927745f39e0d1e4
 
     def _build_hyprland_prompt(self, template: str) -> str:
         """Создаёт промпт для Hyprland — только замена переменных."""
         return f"""Ты эксперт по Hyprland. Проанализируй скриншот и модифицируй шаблон.
 
-## ⚠️ КРИТИЧЕСКИ ВАЖНО — ПРОЧИТАЙ ВНИМАТЕЛЬНО:
+## ⚠️ ВАЖНО — ВЕРНИ ТОЛЬКО КОД:
 
-Твоя задача — ТОЛЬКО заменить переменные в шаблоне на основе скриншота.
+- Верни ТОЛЬКО код конфига, БЕЗ markdown разметки (НЕ используй ```hyprland, ``` и т.д.)
+- НЕ добавляй пояснений, комментариев или описаний
+- Верни чистый код конфигурации
+
+## Твоя задача:
+ТОЛЬКО заменить переменные в шаблоне на основе скриншота.
 НЕ добавляй новый код, НЕ удаляй существующий, НЕ меняй структуру.
 
 ## Что нужно распознать со скриншота и заменить:
@@ -224,10 +389,7 @@ class SeparateGenerator:
 {template}
 
 ## Формат ответа:
-Верни ТОЛЬКО полный код Hyprland конфига в блоке:
-```hyprland
-# весь конфиг с заменёнными переменными
-```
+Верни ТОЛЬКО чистый код конфига БЕЗ markdown разметки (без ```hyprland, ``` и т.д.)
 
 ## ⚠️ ЗАПРЕЩЕНО:
 - Добавлять новые секции
@@ -310,18 +472,9 @@ class SeparateGenerator:
 {style_template}
 
 ## Формат ответа:
-```json
-{{
-  "layer": "top",
-  "position": "top",
-  "height": 30,
-  "modules-left": ["hyprland/workspaces", "tray"],
-  "modules-center": ["hyprland/window"],
-  "modules-right": ["pulseaudio", "network", "battery", "clock"],
-  ...
-}}
-```
+Верни ТОЛЬКО чистый JSON и CSS БЕЗ markdown разметки (без ```json, ```css и т.д.)
 
+<<<<<<< HEAD
 ```css
 * {{
     font-family: "JetBrainsMono Nerd Font";
@@ -343,6 +496,9 @@ window#waybar {{
 ## Разрешённые CSS-свойства для GTK3 (Waybar):
 `background`, `background-color`, `color`, `border`, `border-radius`, `border-bottom`, `border-top`, `margin`, `padding`, `font-family`, `font-size`, `font-weight`, `min-height`, `min-width`, `opacity`, `text-shadow`, `box-shadow`, `transition`.
 Всё остальное, особенно `line-height`, `display`, `float`, `position`, `top`, `left`, `width`, `height` — используй с осторожностью или не используй вовсе.
+=======
+Сначала JSON конфиг, потом CSS стиль (разделённые пустой строкой).
+>>>>>>> 19bba975c3ba1563a80f2431b927745f39e0d1e4
 """
 
     def _build_kitty_prompt(self, template: str) -> str:
@@ -352,7 +508,7 @@ window#waybar {{
 ## КРИТИЧЕСКИ ВАЖНО:
 - Пиши ТОЛЬКО чистый код БЕЗ комментариев
 - Не используй # комментарии в конфиге
-- Верни ПОЛНЫЙ конфиг без сокращений
+- Верни ПОЛНЫЕ файлы без сокращений
 
 ## Распознай со скриншота:
 - Цветовую схему (foreground, background, color0-15)
@@ -428,26 +584,9 @@ color1 #f7768e
 {style_template}
 
 ## Формат ответа:
-```config
-mode=drun
-width=30%
-height=40%
-location=center
-show=drun
-...
-```
+Верни ТОЛЬКО чистый код БЕЗ markdown разметки (без ```config, ```css и т.д.)
 
-```css
-window {{
-    background-color: #1e1e2e;
-    color: #cdd6f4;
-    ...
-}}
-#input {{
-    ...
-}}
-...
-```
+Сначала wofi_config, потом wofi_style.css (разделённые пустой строкой).
 """
 
     def _extract_wofi_config(self, text: str) -> str:
@@ -488,39 +627,6 @@ window {{
 
         # Если не найдено, возвращаем весь текст
         return text.strip()
-
-    def _extract_color_json(self, text: str) -> dict:
-        """Извлекает JSON с цветами и параметрами."""
-        match = re.search(r"```(?:json)?\s*({.*?})\s*```", text, re.DOTALL)
-        if match:
-            json_str = match.group(1)
-            try:
-                return json.loads(json_str)
-            except json.JSONDecodeError:
-                pass
-
-        # Если не найдено, пробуем найти JSON без markdown блока
-        match = re.search(r"\{.*\}", text, re.DOTALL)
-        if match:
-            try:
-                return json.loads(match.group(0))
-            except json.JSONDecodeError:
-                pass
-
-        # Возвращаем пустой словарь с подсказками
-        return {
-            "error": "Не удалось распознать цвета",
-            "manual_setup": True,
-            "variables": {
-                "gaps_in": 5,
-                "gaps_out": 20,
-                "active_border": "rgba(33ccffaa)",
-                "inactive_border": "rgba(595959aa)",
-                "active_opacity": 1.0,
-                "inactive_opacity": 0.9,
-                "rounding": 10,
-            },
-        }
 
     def _extract_json_config(self, text: str) -> str:
         """Извлекает JSON конфиг."""
