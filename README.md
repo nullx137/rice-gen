@@ -288,7 +288,7 @@ python -m rice_generator screenshot.png --wallpaper-model openai/dall-e-3
 
 | Исходник (скриншот) | Результат (сгенерировано) |
 |:---:|:---:|
-| ![source](source.png`) | ![result](result.png) |
+| ![source](source.png) | ![result](result.png) |
 
 
 ## 🖥️ Примеры команд
