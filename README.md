@@ -263,15 +263,12 @@ python -m rice_generator screenshot.png --wallpaper-model openai/dall-e-3
 | `OPENROUTER_API_KEY` | API ключ OpenRouter | (обязательно для openrouter) |
 | `COMETAPI_API_KEY` | API ключ CometAPI | (обязательно для cometapi) |
 | `COMETAPI_BASE_URL` | URL CometAPI | `https://api.cometapi.com/v1` |
-<<<<<<< HEAD
 | `RICE_MODEL` | Модель для анализа | `google/gemini-3-flash-preview` |
 | `WALLPAPER_ENABLED` | Включить генерацию обоев (`true`/`false`) | `true` |
 | `WALLPAPER_MODEL` | Модель для генерации обоев | `google/gemini-3-pro-image-preview` |
-=======
 | `RICE_MODEL` | Модель для анализа скриншота | `google/gemini-3-flash-preview` |
 | `WALLPAPER_MODEL` | Модель для генерации обоев | `openai/dall-e-3` |
 | `WALLPAPER_TOOL` | Инструмент для установки обоев | `swaybg` |
->>>>>>> 19bba975c3ba1563a80f2431b927745f39e0d1e4
 | `REQUEST_TIMEOUT` | Таймаут запроса (сек) | `120` |
 | `MAX_RETRIES` | Количество повторных попыток | `3` |
 | `MAX_TOKENS` | Общий лимит токенов | `16384` |
@@ -291,7 +288,7 @@ python -m rice_generator screenshot.png --wallpaper-model openai/dall-e-3
 
 | Исходник (скриншот) | Результат (сгенерировано) |
 |:---:|:---:|
-| ![source](source.jpg`) | ![result](result.png) |
+| ![source](source.png`) | ![result](result.png) |
 
 
 ## 🖥️ Примеры команд

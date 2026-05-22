@@ -37,7 +37,7 @@ generated_configs/
 *.log
 *.png
 !source.png
-!result.jpg
+!result.png
 
 # Test files
 my-rice/
