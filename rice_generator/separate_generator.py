@@ -148,6 +148,39 @@ class SeparateGenerator:
 
         return self._extract_code_block(response, "kitty")
 
+    def generate_wallpaper(
+        self,
+        screenshot_path: str | Path,
+    ) -> bytes:
+        """
+        Генерирует обои на основе скриншота.
+
+        Модели передаётся скриншот и надпись, что нужно извлечь
+        из скриншота только обои и сгенерировать их.
+
+        Args:
+            screenshot_path: Путь к скриншоту.
+
+        Returns:
+            Байты PNG-изображения обоев.
+        """
+        prompt = (
+            "Проанализируй скриншот и извлеки из него только обои (фон рабочего стола). "
+            "Сгенерируй изображение обоев, максимально точно соответствующее фону на скриншоте. "
+            "Если на скриншоте видны окна, панели, иконки или другие элементы интерфейса — "
+            "полностью игнорируй их, сгенерируй только чистые обои. "
+            "Сохрани цветовую схему, стиль, градиенты и текстуры фона. "
+            "Верни только изображение обоев, никакого текста."
+        )
+
+        with OpenRouterClient(self.api_key, self.model, self.provider) as client:
+            image_bytes = client.generate_wallpaper_image(
+                screenshot_path=screenshot_path,
+                prompt_text=prompt,
+            )
+
+        return image_bytes
+
     def _build_hyprland_prompt(self, template: str) -> str:
         """Создаёт промпт для Hyprland — только замена переменных."""
         return f"""Ты эксперт по Hyprland. Проанализируй скриншот и модифицируй шаблон.
@@ -301,6 +334,15 @@ window#waybar {{
 }}
 ...
 ```
+
+## ⚠️ АБСОЛЮТНЫЙ ЗАПРЕТ — НИ ПРИ КАКОМ УСЛОВИИ:
+- НЕ ИСПОЛЬЗУЙ свойство `line-height` в CSS. Это свойство НЕ поддерживается GTK3 CSS, и его наличие вызовет критическую ошибку: `style.css:X:Y 'line-height' is not a valid property name`. Waybar использует GTK3 CSS, а не стандартный браузерный CSS.
+- НЕ ИСПОЛЬЗУЙ `line-height` ни для window#waybar, ни для модулей, ни для любых других селекторов. Никогда. Ни в каком виде.
+- Если нужно управлять вертикальным выравниванием — используй ТОЛЬКО `padding` (вертикальные отступы).
+
+## Разрешённые CSS-свойства для GTK3 (Waybar):
+`background`, `background-color`, `color`, `border`, `border-radius`, `border-bottom`, `border-top`, `margin`, `padding`, `font-family`, `font-size`, `font-weight`, `min-height`, `min-width`, `opacity`, `text-shadow`, `box-shadow`, `transition`.
+Всё остальное, особенно `line-height`, `display`, `float`, `position`, `top`, `left`, `width`, `height` — используй с осторожностью или не используй вовсе.
 """
 
     def _build_kitty_prompt(self, template: str) -> str:

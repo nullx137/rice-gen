@@ -33,6 +33,12 @@ class Settings:
     REQUEST_TIMEOUT: int = int(os.getenv("REQUEST_TIMEOUT", "120"))
     MAX_RETRIES: int = int(os.getenv("MAX_RETRIES", "3"))
 
+    # === Wallpaper Generation ===
+    WALLPAPER_ENABLED: bool = os.getenv("WALLPAPER_ENABLED", "true").lower() == "true"
+    WALLPAPER_MODEL: str = os.getenv(
+        "WALLPAPER_MODEL", "google/gemini-3-pro-image-preview"
+    )
+
     # === Лимиты токенов ===
     MAX_TOKENS: int = int(os.getenv("MAX_TOKENS", "16384"))
 

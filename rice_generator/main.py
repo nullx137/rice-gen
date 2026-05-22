@@ -102,6 +102,8 @@ class RiceGenerator:
         separate: bool = True,
         hyprland_config: str | Path | None = None,
         provider: str | None = None,
+        wallpaper_model: str | None = None,
+        wallpaper_enabled: bool = True,
     ):
         """
         Инициализация генератора.
@@ -113,6 +115,8 @@ class RiceGenerator:
             separate: Использовать раздельные запросы (рекомендуется).
             hyprland_config: Путь к пользовательскому hyprland.conf (по умолчанию: встроенный шаблон).
             provider: API провайдер (openrouter или cometapi).
+            wallpaper_model: Модель для генерации обоев (по умолчанию из конфига).
+            wallpaper_enabled: Включить генерацию обоев.
         """
         self.api_key = api_key
         self.templates_dir = Path(templates_dir) if templates_dir else None
@@ -120,6 +124,8 @@ class RiceGenerator:
         self.separate = separate
         self.hyprland_config = Path(hyprland_config) if hyprland_config else None
         self.provider = provider or settings.API_PROVIDER
+        self.wallpaper_model = wallpaper_model or settings.WALLPAPER_MODEL
+        self.wallpaper_enabled = wallpaper_enabled
 
         if self.templates_dir is None:
             self.templates_dir = Path(__file__).parent / "templates"
@@ -232,6 +238,29 @@ class RiceGenerator:
                 spinner.stop(success=False)
                 raise
 
+            # 5. Генерация обоев (опционально, отдельная модель)
+            wallpaper_bytes: bytes | None = None
+            if self.wallpaper_enabled:
+                if settings.REQUEST_DELAY > 0:
+                    print(f"{DIM}   ⏳ Ожидание {settings.REQUEST_DELAY}с...{RESET}")
+                    time.sleep(settings.REQUEST_DELAY)
+
+                spinner.start("Генерация обоев...", CYAN)
+                try:
+                    wallpaper_generator = SeparateGenerator(
+                        self.api_key,
+                        self.wallpaper_model,
+                        self.provider,
+                    )
+                    wallpaper_bytes = wallpaper_generator.generate_wallpaper(
+                        screenshot_path=screenshot_path,
+                    )
+                    spinner.stop(success=True)
+                except Exception as e:
+                    spinner.stop(success=False)
+                    print(f"{RED}⚠ Ошибка генерации обоев: {e}{RESET}")
+                    wallpaper_bytes = None
+
             print("=" * 40)
             print("📝 Обработка результатов...")
 
@@ -272,10 +301,11 @@ class RiceGenerator:
             # Парсинг ответа
             parser = ConfigParser(response)
             config = parser.parse()
+            wallpaper_bytes = None
 
         # Генерация файлов
         gen = ConfigGenerator(config, output_dir)
-        paths = gen.generate_all()
+        paths = gen.generate_all(wallpaper_bytes=wallpaper_bytes)
 
         print(f"✅ Конфиги сгенерированы в: {output_dir.absolute()}")
         print(f"📄 Файлов создано: {len(paths)}")

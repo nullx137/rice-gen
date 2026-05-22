@@ -9,6 +9,7 @@
 - 🔧 **Installer** — автоматическая установка конфигов с бэкапом
 - ↩️ **Uninstaller** — откат изменений и восстановление из бэкапа
 - 🤖 **AI-powered** — использует Google Gemini через OpenRouter или CometAPI
+- 🖼️ **Генерация обоев** — извлекает и воссоздаёт обои со скриншота (отдельная модель)
 - 📝 **Свой конфиг Hyprland** — используйте свой конфиг как шаблон
 - 🚀 **Wofi Launcher** — генерация конфига для лаунчера приложений
 
@@ -56,6 +57,12 @@ python -m rice_generator screenshot.png -o ./my-rice
 # Использовать CometAPI
 python -m rice_generator screenshot.png --provider cometapi -o ./my-rice
 
+# С генерацией обоев (отдельная модель)
+python -m rice_generator screenshot.png --provider cometapi --wallpaper-model google/gemini-3-pro-image-preview -o ./my-rice
+
+# Отключить генерацию обоев
+python -m rice_generator screenshot.png --no-wallpaper -o ./output
+
 # Использовать свой конфиг Hyprland как шаблон
 python -m rice_generator screenshot.png -H ~/.config/hypr/hyprland.conf -o ./my-rice
 
@@ -66,7 +73,7 @@ python -m rice_generator screenshot.png --api-key your_key -m google/gemini-3-fl
 ## 📖 Команды CLI
 
 ```
-usage: rice-generator [-h] [-o OUTPUT] [--api-key API_KEY] [--provider PROVIDER] [-m MODEL] [-t TEMPLATES] [-H HYPRLAND_CONFIG] [-v] [--version]
+usage: rice-generator [-h] [-o OUTPUT] [--api-key API_KEY] [--provider PROVIDER] [-m MODEL] [--wallpaper-model WALLPAPER_MODEL] [--no-wallpaper] [-t TEMPLATES] [-H HYPRLAND_CONFIG] [-v] [--version]
 
 positional arguments:
   screenshot            Путь к скриншоту для анализа
@@ -79,6 +86,9 @@ options:
   --provider PROVIDER    API провайдер: openrouter или cometapi (по умолчанию: openrouter)
   -m MODEL, --model MODEL
                         Модель для анализа (по умолчанию: google/gemini-3-flash-preview)
+  --wallpaper-model WALLPAPER_MODEL
+                        Модель для генерации обоев (по умолчанию: google/gemini-3-pro-image-preview)
+  --no-wallpaper        Отключить генерацию обоев
   -t TEMPLATES, --templates TEMPLATES
                         Директория с шаблонами
   -H HYPRLAND_CONFIG, --hyprland-config HYPRLAND_CONFIG
@@ -151,12 +161,14 @@ rice-generator/
    - Отступы (gaps, padding)
    - Расположение элементов (бар, иконки, лаунчер)
    - Прозрачность и закругления
-3. **Генерация конфигов**:
+3. **Генерация конфигов** (раздельными запросами к ИИ):
    - **Hyprland** — модифицирует шаблон (заменяет gaps, цвета, opacity, rounding, shadow, blur)
    - **Waybar** — создаётся `config.json` и `style.css`
    - **Wofi** — создаётся `config` и `style.css` для лаунчера
    - **Kitty** — создаётся `kitty.conf` с цветовой схемой
-4. **Создание скриптов** — генерируются `installer.sh` и `uninstaller.sh`
+   - **Обои** — извлекает фон со скриншота и генерирует `wallpaper.png` (через отдельную image generation модель)
+4. **ИИ-валидация** — нейросеть проверяет визуальное соответствие конфигов скриншоту и исправляет расхождения (только визуальные параметры, не трогая бинды и функциональные настройки)
+5. **Создание скриптов** — генерируются `installer.sh` и `uninstaller.sh`
 
 ## 📦 Выходные файлы
 
@@ -170,6 +182,7 @@ output/
 ├── wofi_config           # Конфиг Wofi
 ├── wofi_style.css        # Стили Wofi
 ├── kitty.conf            # Конфиг Kitty
+├── wallpaper.png         # Сгенерированные обои (если включено)
 ├── color_scheme.json     # Информация о цветовой схеме
 ├── installer.sh          # Скрипт установки
 └── uninstaller.sh        # Скрипт отката
@@ -186,6 +199,7 @@ chmod +x installer.sh
 Скрипт:
 - Создаст бэкап текущих конфигов
 - Установит новые конфиги (Hyprland, Waybar, Wofi, Kitty)
+- Установит обои `wallpaper.png` в `~/.config/hypr/wallpaper.png` (если были сгенерированы)
 - Перезапустит Waybar
 
 ## ↩️ Откат изменений
@@ -242,6 +256,8 @@ python -m rice_generator screenshot.png -H ~/.config/hypr/hyprland.conf -o ./out
 | `COMETAPI_API_KEY` | API ключ CometAPI | (обязательно для cometapi) |
 | `COMETAPI_BASE_URL` | URL CometAPI | `https://api.cometapi.com/v1` |
 | `RICE_MODEL` | Модель для анализа | `google/gemini-3-flash-preview` |
+| `WALLPAPER_ENABLED` | Включить генерацию обоев (`true`/`false`) | `true` |
+| `WALLPAPER_MODEL` | Модель для генерации обоев | `google/gemini-3-pro-image-preview` |
 | `REQUEST_TIMEOUT` | Таймаут запроса (сек) | `120` |
 | `MAX_RETRIES` | Количество повторных попыток | `3` |
 | `MAX_TOKENS` | Общий лимит токенов | `16384` |
@@ -255,7 +271,16 @@ python -m rice_generator screenshot.png -H ~/.config/hypr/hyprland.conf -o ./out
 | `APP_TITLE` | Заголовок приложения | `Rice Generator` |
 | `VERBOSE` | Подробный вывод | `false` |
 
-## 📝 Примеры
+## 📸 Пример работы
+
+Результат генерации rice на основе скриншота:
+
+| Исходник (скриншот) | Результат (сгенерировано) |
+|:---:|:---:|
+| ![source](source.png) | ![result](result.png) |
+
+
+## 🖥️ Примеры команд
 
 ### Генерация с выводом в кастомную директорию
 

@@ -1,6 +1,7 @@
 """Клиент для работы с OpenRouter API / CometAPI и мультимодальной моделью Gemini."""
 
 import base64
+import re
 from pathlib import Path
 from typing import Optional
 
@@ -163,6 +164,125 @@ class APIClient:
 
         data = response.json()
         return data["choices"][0]["message"]["content"]
+
+    def generate_wallpaper_image(
+        self,
+        screenshot_path: str | Path,
+        prompt_text: str,
+    ) -> bytes:
+        """
+        Генерирует обои (PNG) на основе скриншота через image generation API.
+
+        Для CometAPI использует Gemini image generation endpoint (v1beta).
+        Для OpenRouter — стандартный chat completions с image generation моделью
+        (извлекает base64 из markdown-ответа).
+
+        Args:
+            screenshot_path: Путь к скриншоту.
+            prompt_text: Текстовый промпт для генерации.
+
+        Returns:
+            Байты PNG-изображения.
+
+        Raises:
+            ValueError: Если не удалось извлечь изображение из ответа API.
+            httpx.HTTPStatusError: При ошибке API.
+        """
+        image_base64 = self._encode_image(screenshot_path)
+
+        if self.provider == "cometapi":
+            # CometAPI проксирует Google Generative Language API (Gemini)
+            url = f"https://api.cometapi.com/v1beta/models/{self.model}:generateContent"
+            payload = {
+                "contents": [
+                    {
+                        "parts": [
+                            {
+                                "inlineData": {
+                                    "mimeType": "image/png",
+                                    "data": image_base64,
+                                }
+                            },
+                            {"text": prompt_text},
+                        ]
+                    }
+                ],
+                "generationConfig": {
+                    "responseModalities": ["TEXT", "IMAGE"],
+                    "imageConfig": {
+                        "aspectRatio": "16:9",
+                        "imageSize": "4K",
+                    },
+                },
+            }
+            # Gemini v1beta endpoint требует x-goog-api-key и НЕ принимает
+            # Authorization: Bearer (который уже установлен в self.client).
+            # Поэтому используем отдельный временный клиент.
+            with httpx.Client(timeout=settings.REQUEST_TIMEOUT) as temp_client:
+                response = temp_client.post(
+                    url,
+                    json=payload,
+                    headers={
+                        "x-goog-api-key": self.api_key,
+                        "Content-Type": "application/json",
+                    },
+                )
+            response.raise_for_status()
+            data = response.json()
+
+            for candidate in data.get("candidates", []):
+                for part in candidate.get("content", {}).get("parts", []):
+                    inline_data = part.get("inlineData")
+                    if inline_data and inline_data.get("data"):
+                        return base64.b64decode(inline_data["data"])
+
+            raise ValueError(
+                "Не удалось извлечь изображение из ответа CometAPI. "
+                f"Ответ: {data}"
+            )
+
+        else:
+            # OpenRouter fallback: через chat completions + image gen модель
+            payload = {
+                "model": self.model,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/png;base64,{image_base64}"
+                                },
+                            },
+                            {"type": "text", "text": prompt_text},
+                        ],
+                    }
+                ],
+                "max_tokens": 4096,
+            }
+            response = self.client.post("/chat/completions", json=payload)
+            response.raise_for_status()
+            data = response.json()
+            content = data["choices"][0]["message"]["content"]
+
+            # Ищем base64 в markdown ![...](data:image/png;base64,...)
+            b64_match = re.search(
+                r"data:image/png;base64,([A-Za-z0-9+/=]+)", content
+            )
+            if b64_match:
+                return base64.b64decode(b64_match.group(1))
+
+            # Или ищем голый base64 блок
+            b64_match = re.search(r"```\n([A-Za-z0-9+/=\s]+)\n```", content)
+            if b64_match:
+                cleaned = b64_match.group(1).replace("\n", "").replace(" ", "")
+                return base64.b64decode(cleaned)
+
+            raise ValueError(
+                "Не удалось извлечь изображение из ответа OpenRouter. "
+                f"Ответ: {content[:500]}"
+            )
 
     def _build_prompt(self, hyprland: str, waybar: str, kitty: str) -> str:
         """

@@ -154,9 +154,12 @@ class ConfigGenerator:
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-    def generate_all(self) -> dict[str, Path]:
+    def generate_all(self, wallpaper_bytes: Optional[bytes] = None) -> dict[str, Path]:
         """
         Генерирует все файлы конфигов.
+
+        Args:
+            wallpaper_bytes: Опциональные байты PNG обоев.
 
         Returns:
             Словарь с путями к сгенерированным файлам.
@@ -181,9 +184,13 @@ class ConfigGenerator:
         )
         paths["kitty"] = self._save_file("kitty.conf", self.config.kitty_conf)
 
+        # Обои
+        if wallpaper_bytes:
+            paths["wallpaper"] = self._save_binary("wallpaper.png", wallpaper_bytes)
+
         # Генерируем скрипты
-        paths["installer"] = self._generate_installer()
-        paths["uninstaller"] = self._generate_uninstaller()
+        paths["installer"] = self._generate_installer(wallpaper_bytes is not None)
+        paths["uninstaller"] = self._generate_uninstaller(wallpaper_bytes is not None)
 
         # Генерируем информацию о цветовой схеме
         paths["colors"] = self._save_file(
@@ -217,14 +224,40 @@ class ConfigGenerator:
         filepath.write_text(content, encoding="utf-8")
         return filepath
 
-    def _generate_installer(self) -> Path:
+    def _save_binary(self, filename: str, content: bytes) -> Path:
+        """
+        Сохраняет бинарный файл в директорию вывода.
+
+        Args:
+            filename: Имя файла.
+            content: Бинарные данные.
+
+        Returns:
+            Путь к сохранённому файлу.
+        """
+        filepath = self.output_dir / filename
+        filepath.write_bytes(content)
+        return filepath
+
+    def _generate_installer(self, has_wallpaper: bool = False) -> Path:
         """
         Генерирует скрипт installer.sh.
+
+        Args:
+            has_wallpaper: Есть ли обои для установки.
 
         Returns:
             Путь к скрипту установщика.
         """
-        script = '''#!/bin/bash
+        wallpaper_section = """
+# Установка обоев
+if [ -f "$SCRIPT_DIR/wallpaper.png" ]; then
+    cp "$SCRIPT_DIR/wallpaper.png" "$HOME/.config/hypr/wallpaper.png"
+    echo "  ✓ Wallpaper установлен"
+fi
+""" if has_wallpaper else ""
+
+        script = f'''#!/bin/bash
 # Installer для rice конфига
 # Сгенерировано rice-generator
 
@@ -241,17 +274,17 @@ NC='\\033[0m' # No Color
 
 # Проверка прав суперпользователя
 if [ "$EUID" -eq 0 ]; then
-    echo -e "${RED}Не запускайте скрипт от root!${NC}"
+    echo -e "${{RED}}Не запускайте скрипт от root!${{NC}}"
     exit 1
 fi
 
 # Директория со скриптом
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+SCRIPT_DIR="$( cd "$( dirname "${{BASH_SOURCE[0]}}" )" && pwd )"
 
 # Бэкап текущих конфигов
 BACKUP_DIR="$HOME/.config/rice_backups/backup_$(date +%Y%m%d_%H%M%S)"
 
-echo -e "${YELLOW}[1/5] Создание бэкапа текущих конфигов...${NC}"
+echo -e "${{YELLOW}}[1/5] Создание бэкапа текущих конфигов...${{NC}}"
 mkdir -p "$BACKUP_DIR"
 
 # Бэкап Hyprland
@@ -272,34 +305,34 @@ if [ -d "$HOME/.config/kitty" ]; then
     echo "  ✓ Kitty конфиги сохранены"
 fi
 
-echo -e "${GREEN}Бэкап создан в: $BACKUP_DIR${NC}"
+echo -e "${{GREEN}}Бэкап создан в: $BACKUP_DIR${{NC}}"
 echo ""
 
 # Установка новых конфигов
-echo -e "${YELLOW}[2/5] Установка конфигов Hyprland...${NC}"
+echo -e "${{YELLOW}}[2/5] Установка конфигов Hyprland...${{NC}}"
 mkdir -p "$HOME/.config/hypr"
 cp "$SCRIPT_DIR/hyprland.conf" "$HOME/.config/hypr/hyprland.conf"
 echo "  ✓ Hyprland конфиг установлен"
 
-echo -e "${YELLOW}[3/5] Установка конфигов Waybar...${NC}"
+echo -e "${{YELLOW}}[3/5] Установка конфигов Waybar...${{NC}}"
 mkdir -p "$HOME/.config/waybar"
 cp "$SCRIPT_DIR/waybar_config.json" "$HOME/.config/waybar/config"
 cp "$SCRIPT_DIR/waybar_style.css" "$HOME/.config/waybar/style.css"
 echo "  ✓ Waybar конфиги установлены"
 
-echo -e "${YELLOW}[4/6] Установка конфигов Wofi...${NC}"
+echo -e "${{YELLOW}}[4/6] Установка конфигов Wofi...${{NC}}"
 mkdir -p "$HOME/.config/wofi"
 cp "$SCRIPT_DIR/wofi_config" "$HOME/.config/wofi/config"
 cp "$SCRIPT_DIR/wofi_style.css" "$HOME/.config/wofi/style.css"
 echo "  ✓ Wofi конфиги установлены"
 
-echo -e "${YELLOW}[5/6] Установка конфигов Kitty...${NC}"
+echo -e "${{YELLOW}}[5/6] Установка конфигов Kitty...${{NC}}"
 mkdir -p "$HOME/.config/kitty"
 cp "$SCRIPT_DIR/kitty.conf" "$HOME/.config/kitty/kitty.conf"
 echo "  ✓ Kitty конфиг установлен"
 
-echo -e "${YELLOW}[6/6] Применение изменений...${NC}"
-
+echo -e "${{YELLOW}}[6/6] Применение изменений...${{NC}}"
+{wallpaper_section}
 # Перезагрузка Waybar
 if pgrep -x "waybar" > /dev/null; then
     killall waybar
@@ -315,7 +348,7 @@ echo "  ℹ Kitty: закройте все окна Kitty и откройте з
 echo "  ✓ Hyprland: конфиги применятся автоматически"
 
 echo ""
-echo -e "${GREEN}=== Установка завершена! ===${NC}"
+echo -e "${{GREEN}}=== Установка завершена! ===${{NC}}"
 echo ""
 echo "Для отката изменений используйте:"
 echo "  $BACKUP_DIR/restore.sh"
@@ -324,14 +357,25 @@ echo "Или запустите uninstaller.sh из этой директори�
 '''
         return self._save_file("installer.sh", script)
 
-    def _generate_uninstaller(self) -> Path:
+    def _generate_uninstaller(self, has_wallpaper: bool = False) -> Path:
         """
         Генерирует скрипт uninstaller.sh.
+
+        Args:
+            has_wallpaper: Есть ли обои для удаления.
 
         Returns:
             Путь к скрипту uninstaller.
         """
-        script = '''#!/bin/bash
+        wallpaper_uninstall = """
+# Удаление обоев
+if [ -f "$HOME/.config/hypr/wallpaper.png" ]; then
+    rm "$HOME/.config/hypr/wallpaper.png"
+    echo "  ✓ wallpaper.png удалён"
+fi
+""" if has_wallpaper else ""
+
+        script = f'''#!/bin/bash
 # Uninstaller для rice конфига
 # Сгенерировано rice-generator
 
@@ -347,9 +391,9 @@ YELLOW='\\033[1;33m'
 NC='\\033[0m' # No Color
 
 # Директория со скриптом
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+SCRIPT_DIR="$( cd "$( dirname "${{BASH_SOURCE[0]}}" )" && pwd )"
 
-echo -e "${YELLOW}Этот скрипт удалит установленные конфиги и восстановит оригинальные.${NC}"
+echo -e "${{YELLOW}}Этот скрипт удалит установленные конфиги и восстановит оригинальные.${{NC}}"
 echo ""
 read -p "Продолжить? (y/N): " -n 1 -r
 echo
@@ -359,13 +403,15 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
 fi
 
 echo ""
-echo -e "${YELLOW}[1/3] Удаление конфигов Hyprland...${NC}"
+echo -e "${{YELLOW}}[1/3] Удаление конфигов Hyprland...${{NC}}"
 if [ -f "$HOME/.config/hypr/hyprland.conf" ]; then
     rm "$HOME/.config/hypr/hyprland.conf"
     echo "  ✓ hyprland.conf удалён"
 fi
 
-echo -e "${YELLOW}[2/4] Удаление конфигов Waybar...${NC}"
+{wallpaper_uninstall}
+
+echo -e "${{YELLOW}}[2/4] Удаление конфигов Waybar...${{NC}}"
 if [ -f "$HOME/.config/waybar/config" ]; then
     rm "$HOME/.config/waybar/config"
     echo "  ✓ waybar/config удалён"
@@ -375,7 +421,7 @@ if [ -f "$HOME/.config/waybar/style.css" ]; then
     echo "  ✓ waybar/style.css удалён"
 fi
 
-echo -e "${YELLOW}[3/4] Удаление конфигов Wofi...${NC}"
+echo -e "${{YELLOW}}[3/4] Удаление конфигов Wofi...${{NC}}"
 if [ -f "$HOME/.config/wofi/config" ]; then
     rm "$HOME/.config/wofi/config"
     echo "  ✓ wofi/config удалён"
@@ -385,34 +431,34 @@ if [ -f "$HOME/.config/wofi/style.css" ]; then
     echo "  ✓ wofi/style.css удалён"
 fi
 
-echo -e "${YELLOW}[4/4] Удаление конфигов Kitty...${NC}"
+echo -e "${{YELLOW}}[4/4] Удаление конфигов Kitty...${{NC}}"
 if [ -f "$HOME/.config/kitty/kitty.conf" ]; then
     rm "$HOME/.config/kitty/kitty.conf"
     echo "  ✓ kitty.conf удалён"
 fi
 
 echo ""
-echo -e "${GREEN}Конфиги удалены!${NC}"
+echo -e "${{GREEN}}Конфиги удалены!${{NC}}"
 echo ""
-echo -e "${YELLOW}Поиск доступных бэкапов...${NC}"
+echo -e "${{YELLOW}}Поиск доступных бэкапов...${{NC}}"
 
 BACKUP_BASE="$HOME/.config/rice_backups"
 if [ -d "$BACKUP_BASE" ]; then
     BACKUPS=($(ls -dt "$BACKUP_BASE"/backup_* 2>/dev/null))
-    if [ ${#BACKUPS[@]} -gt 0 ]; then
+    if [ ${{#BACKUPS[@]}} -gt 0 ]; then
         echo ""
         echo "Найдены следующие бэкапы:"
-        for i in "${!BACKUPS[@]}"; do
-            echo "  $((i+1))) ${BACKUPS[$i]}"
+        for i in "${{!BACKUPS[@]}}"; do
+            echo "  $((i+1))) ${{BACKUPS[$i]}}"
         done
         echo "  0) Не восстанавливать"
         echo ""
         read -p "Выберите бэкап для восстановления: " backup_choice
 
-        if [ "$backup_choice" -gt 0 ] && [ "$backup_choice" -le "${#BACKUPS[@]}" ]; then
-            SELECTED_BACKUP="${BACKUPS[$((backup_choice-1))]}"
+        if [ "$backup_choice" -gt 0 ] && [ "$backup_choice" -le "${{#BACKUPS[@]}}" ]; then
+            SELECTED_BACKUP="${{BACKUPS[$((backup_choice-1))]}}"
             echo ""
-            echo -e "${YELLOW}Восстановление из: $SELECTED_BACKUP${NC}"
+            echo -e "${{YELLOW}}Восстановление из: $SELECTED_BACKUP${{NC}}"
 
             if [ -d "$SELECTED_BACKUP/hypr" ]; then
                 mkdir -p "$HOME/.config/hypr"
@@ -439,7 +485,7 @@ if [ -d "$BACKUP_BASE" ]; then
             fi
             waybar &
             echo ""
-            echo -e "${GREEN}Бэкап восстановлен!${NC}"
+            echo -e "${{GREEN}}Бэкап восстановлен!${{NC}}"
         else
             echo "Восстановление отменено."
         fi
@@ -451,6 +497,7 @@ else
 fi
 
 echo ""
-echo -e "${GREEN}=== Uninstaller завершён! ===${NC}"
+echo -e "${{GREEN}}=== Uninstaller завершён! ===${{NC}}"
 '''
         return self._save_file("uninstaller.sh", script)
+

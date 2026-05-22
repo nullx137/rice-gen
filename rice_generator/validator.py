@@ -180,8 +180,15 @@ class AIValidator:
 
         return f"""Ты эксперт по Linux rice. Проверь конфиги на соответствие скриншоту.
 
-## ГЛАВНАЯ ЗАДАЧА:
-Внимательно рассмотри скриншот и проверь конфиги Waybar на наличие и правильное расположение модулей.
+## ⚠️ КРИТИЧЕСКИ ВАЖНО — ЧТО МОЖНО ПРОВЕРЯТЬ:
+Ты должен проверять ТОЛЬКО визуальные параметры и внешний вид.
+НИКОГДА не создавай замечания, связанные с:
+- binds, input, monitor, exec-once, exec, env
+- layerrule, windowrule, windowrulev2, workspace
+- переменными, не относящимися к цветам/визуальному оформлению
+- путями к скриптам, командам, программам
+- горячими клавишами, раскладками клавиатуры, сенситивити мыши
+- настройками аудио, сети, Bluetooth и т.д.
 
 ## 🔍 ПРОВЕРКА WAYBAR — МОДУЛИ (ПРИОРИТЕТ #1):
 
@@ -209,10 +216,10 @@ class AIValidator:
 - Прозрачный или сплошной фон?
 - Высота бара соответствует скриншоту?
 
-## 📝 ПРОВЕРКА ДРУГИХ КОНФИГОВ:
+## 📝 ПРОВЕРКА ДРУГИХ КОНФИГОВ (ТОЛЬКО ВИЗУАЛЬНЫЕ ПАРАМЕТРЫ):
 
-### Hyprland (если есть):
-- gaps_in / gaps_out — совпадают ли отступы
+### Hyprland — можно проверять:
+- gaps_in / gaps_out — отступы
 - col.active_border — цвет активной рамки
 - col.inactive_border — цвет неактивной рамки
 - rounding — скругления углов
@@ -221,11 +228,27 @@ class AIValidator:
 - shadow.enabled, shadow.range — тени
 - blur.enabled, blur.size — блюр
 
-### Kitty (если есть):
+### Hyprland — НЕЛЬЗЯ проверять и предлагать изменять:
+- binds (любые горячие клавиши)
+- input (раскладка, сенситивити, accel speed и т.д.)
+- monitor (разрешение, частота, позиция)
+- exec / exec-once / env
+- layerrule / windowrule / windowrulev2 / workspace
+
+### Kitty — можно проверять:
 - foreground / background — цвета
 - color0-15 — палитра
 - font_family / font_size — шрифт
 - window_padding_width — отступы
+- cursor / cursor_text_color
+
+### Kitty — НЕЛЬЗЯ проверять:
+- shell_integration
+- scrollback_lines
+- cursor_blink_interval
+- enable_audio_bell
+- map (горячие клавиши)
+- любые другие функциональные параметры
 
 ## Конфигурационные файлы:
 {configs_text}
@@ -274,7 +297,38 @@ class AIValidator:
 
 ## ЗАДАЧА:
 Исправь найденные расхождения между конфигами и скриншотом.
-Измени ТОЛЬКО проблемные параметры, остальное оставь без изменений.
+
+## ⚠️ АБСОЛЮТНЫЙ ЗАПРЕТ — НИ ПРИ КАКОМ УСЛОВИИ НЕ МЕНЯЙ:
+- **В Hyprland:**
+  - ВСЕ binds (горячие клавиши, хоткеи, мышиные бинды)
+  - input (раскладка клавиатуры, сенситивити мыши, accel speed и т.д.)
+  - monitor (разрешение, частота, позиция, масштаб)
+  - exec-once, exec, env
+  - layerrule, windowrule, windowrulev2, workspace
+  - любые переменные и пути к скриптам/программам
+  - любые декларации, не относящиеся к визуальному оформлению
+
+- **В Waybar:**
+  - НЕ меняй формат вывода модулей (кроме CSS-стилей)
+  - НЕ добавляй/удаляй настройки модулей, кроме их наличия в modules-left/center/right
+  - НЕ меняй команды, интервалы опроса, пути к скриптам
+
+- **В Kitty:**
+  - НЕ меняй shell_integration
+  - НЕ меняй scrollback_lines, cursor_blink_interval, enable_audio_bell
+  - НЕ меняй map (любые горячие клавиши)
+  - НЕ меняй функциональные параметры
+
+## ✅ РАЗРЕШЁННЫЕ ИЗМЕНЕНИЯ (и НИЧЕГО БОЛЬШЕ):
+- **Hyprland:** gaps_in, gaps_out, col.active_border, col.inactive_border, rounding, active_opacity, inactive_opacity, border_size, shadow.*, blur.*, decoration.*
+- **Waybar:** modules-left, modules-center, modules-right, height, layer, position, а также ТОЛЬКО CSS-свойства (background, color, border-radius, padding, margin, font-family, font-size, opacity)
+- **Kitty:** foreground, background, color0-15, selection_foreground, selection_background, cursor, cursor_text_color, window_padding_width, font_family, font_size
+
+## 🛡️ ПРАВИЛО ОБРАБОТКИ ЗАМЕЧАНИЙ:
+1. Если замечание требует изменить что-то из ЗАПРЕЩЁННОГО списка — **ПОЛНОСТЬЮ ИГНОРИРУЙ** это замечание.
+2. НЕ включай файл в ответ, если для него остались только запрещённые замечания.
+3. Верни ТОЛЬКО те файлы, где нужны РАЗРЕШЁННЫЕ изменения.
+4. Всё остальное в файлах оставь БЕЗ ИЗМЕНЕНИЙ — не добавляй, не удаляй, не переформатируй.
 
 ## Найденные замечания:
 {issues_text}

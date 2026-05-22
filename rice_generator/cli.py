@@ -23,12 +23,16 @@ def main():
   %(prog)s screenshot.png --model google/gemini-2.0-flash-001
   %(prog)s screenshot.png -H ~/.config/hypr/hyprland.conf  # использовать свой конфиг
   %(prog)s screenshot.png --provider cometapi --api-key your_key  # использовать CometAPI
+  %(prog)s screenshot.png --no-wallpaper                           # без обоев
+  %(prog)s screenshot.png --wallpaper-model google/gemini-3-pro-image-preview
 
 Переменные окружения:
   API_PROVIDER           Провайдер API: openrouter или cometapi (по умолчанию: openrouter)
   OPENROUTER_API_KEY     API ключ для OpenRouter
   COMETAPI_API_KEY     API ключ для CometAPI
   RICE_MODEL            Модель для анализа (по умолчанию: google/gemini-2.0-flash-exp:free)
+  WALLPAPER_ENABLED      Генерировать обои: true или false (по умолчанию: true)
+  WALLPAPER_MODEL        Модель для генерации обоев (по умолчанию: google/gemini-3-pro-image-preview)
   REQUEST_TIMEOUT       Таймаут запроса в секундах (по умолчанию: 120)
   MAX_TOKENS            Максимум токенов в ответе (по умолчанию: 4096)
         """,
@@ -72,6 +76,19 @@ def main():
     )
 
     parser.add_argument(
+        "--wallpaper-model",
+        type=str,
+        default=None,
+        help="Модель для генерации обоев (по умолчанию: из конфига WALLPAPER_MODEL)",
+    )
+
+    parser.add_argument(
+        "--no-wallpaper",
+        action="store_true",
+        help="Отключить генерацию обоев",
+    )
+
+    parser.add_argument(
         "-t",
         "--templates",
         type=str,
@@ -103,9 +120,7 @@ def main():
     args = parser.parse_args()
 
     # Проверка наличия API ключа
-    api_key = args.api_key or Path.cwd() / ".env"
-    if not api_key:
-        api_key = None
+    api_key = args.api_key if args.api_key else None
 
     try:
         provider = args.provider or settings.API_PROVIDER
@@ -119,6 +134,8 @@ def main():
             model=args.model,
             hyprland_config=args.hyprland_config,
             provider=provider,
+            wallpaper_model=args.wallpaper_model,
+            wallpaper_enabled=not args.no_wallpaper,
         )
 
         paths = generator.generate(
