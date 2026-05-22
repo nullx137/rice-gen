@@ -19,14 +19,13 @@ def main():
 Примеры использования:
   %(prog)s screenshot.png -o ./output
   %(prog)s ~/Pictures/rice.png --api-key your_key
-  %(prog)s screenshot.png --wallpaper-model openai/dall-e-3 --wallpaper-tool feh
+  %(prog)s screenshot.png --wallpaper-model openai/dall-e-3
 
 Переменные окружения:
   API_PROVIDER           Провайдер API: openrouter или cometapi (по умолчанию: openrouter)
   OPENROUTER_API_KEY     API ключ для OpenRouter
   RICE_MODEL            Модель для анализа (по умолчанию: google/gemini-3-flash-preview)
   WALLPAPER_MODEL       Модель для генерации обоев (по умолчанию: openai/dall-e-3)
-  WALLPAPER_TOOL        Инструмент для установки обоев: hyprpaper или feh
         """,
     )
 
@@ -75,14 +74,6 @@ def main():
     )
 
     parser.add_argument(
-        "--wallpaper-tool",
-        type=str,
-        choices=["hyprpaper", "feh"],
-        default=None,
-        help="Инструмент для установки обоев (по умолчанию: из конфига)",
-    )
-
-    parser.add_argument(
         "-t",
         "--templates",
         type=str,
@@ -119,15 +110,14 @@ def main():
         print(f"📡 API: {provider}")
         print("=" * 40)
 
-        generator = RiceGenerator(
-            api_key=args.api_key,
-            templates_dir=args.templates,
-            model=args.model,
-            hyprland_config=args.hyprland_config,
-            provider=provider,
-            wallpaper_model=args.wallpaper_model,
-            wallpaper_tool=args.wallpaper_tool,
-        )
+            generator = RiceGenerator(
+                api_key=args.api_key,
+                templates_dir=args.templates,
+                model=args.model,
+                hyprland_config=args.hyprland_config,
+                provider=provider,
+                wallpaper_model=args.wallpaper_model,
+            )
 
         paths = generator.generate(
             screenshot_path=args.screenshot,

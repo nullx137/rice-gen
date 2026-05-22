@@ -31,7 +31,7 @@ class Settings:
     WALLPAPER_MODEL: str = os.getenv("WALLPAPER_MODEL", "openai/dall-e-3")
 
     # === Инструменты ===
-    WALLPAPER_TOOL: str = os.getenv("WALLPAPER_TOOL", "hyprpaper").lower()
+    WALLPAPER_TOOL: str = os.getenv("WALLPAPER_TOOL", "swaybg").lower()
 
     # === Таймауты ===
     REQUEST_TIMEOUT: int = int(os.getenv("REQUEST_TIMEOUT", "120"))

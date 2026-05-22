@@ -288,18 +288,40 @@ class AIValidator:
 """
 
     def _extract_analysis_json(self, text: str) -> dict:
-        """Извлекает JSON с анализом из ответа."""
+        """Извлекает JSON с анализом из ответа ИИ."""
         if not text:
             return {"issues": [], "summary": "Пустой ответ от ИИ"}
 
-        match = re.search(r"```(?:json)?\s*({.*?})\s*```", text, re.DOTALL)
-        if match:
+        # Strategy 1: Extract from markdown code blocks
+        patterns = [
+            r"```json\s*(.*?)\s*```",
+            r"```\s*(.*?)\s*```",
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, text, re.DOTALL)
+            if match:
+                content = match.group(1).strip()
+                try:
+                    return json.loads(content)
+                except json.JSONDecodeError as e:
+                    if getattr(settings, 'VERBOSE', False):
+                        print(f"   ⚠️  JSON parse error in analysis block: {e}")
+                    continue
+
+        # Strategy 2: Try to parse the whole stripped text
+        stripped = text.strip()
+        if stripped.startswith("{") and stripped.endswith("}"):
             try:
-                return json.loads(match.group(1))
+                return json.loads(stripped)
             except json.JSONDecodeError:
                 pass
 
-        # Пробуем найти JSON без блока
+        # Strategy 3: Find balanced JSON by brace depth
+        data = self._extract_json_by_braces(text)
+        if data and isinstance(data, dict):
+            return data
+
+        # Strategy 4: Try the old simple regex as last resort
         match = re.search(r"\{.*\}", text, re.DOTALL)
         if match:
             try:
@@ -307,27 +329,114 @@ class AIValidator:
             except json.JSONDecodeError:
                 pass
 
+        preview = text[:200].replace('\n', ' ')
+        print(f"   ⚠️  Не удалось извлечь JSON анализа (preview: {preview}...)")
         return {"issues": [], "summary": "Не удалось проанализировать"}
 
     def _extract_fixed_configs(self, text: str) -> dict[str, str]:
-        """Извлекает исправленные конфиги из ответа."""
+        """Извлекает исправленные конфиги из ответа ИИ."""
         if not text:
+            print("   ⚠️  Пустой ответ от ИИ (извлечение конфигов)")
             return {}
 
-        match = re.search(r"```(?:json)?\s*({.*?})\s*```", text, re.DOTALL)
-        if match:
+        allowed_keys = ["hyprland", "waybar_config", "waybar_style", "wofi_config", "wofi_style", "kitty"]
+
+        # Strategy 1: Extract full content from markdown code blocks
+        # First try ```json ... ``` then ``` ... ```
+        patterns = [
+            r"```json\s*(.*?)\s*```",
+            r"```\s*(.*?)\s*```",
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, text, re.DOTALL)
+            if match:
+                content = match.group(1).strip()
+                try:
+                    data = json.loads(content)
+                    return {k: v for k, v in data.items() if k in allowed_keys}
+                except json.JSONDecodeError as e:
+                    if getattr(settings, 'VERBOSE', False):
+                        print(f"   ⚠️  JSON parse error in code block: {e}")
+                    continue
+
+        # Strategy 2: Try to parse the whole stripped text as JSON
+        stripped = text.strip()
+        if stripped.startswith("{") and stripped.endswith("}"):
             try:
-                data = json.loads(match.group(1))
-                allowed_keys = ["hyprland", "waybar_config", "waybar_style", "wofi_config", "wofi_style", "kitty"]
-                return {
-                    key: value
-                    for key, value in data.items()
-                    if key in allowed_keys
-                }
+                data = json.loads(stripped)
+                return {k: v for k, v in data.items() if k in allowed_keys}
             except json.JSONDecodeError:
                 pass
 
+        # Strategy 3: Find balanced JSON object by tracking brace depth
+        data = self._extract_json_by_braces(text)
+        if data and isinstance(data, dict):
+            return {k: v for k, v in data.items() if k in allowed_keys}
+
+        # Strategy 4: Show partial response for debugging
+        preview = text[:200].replace('\n', ' ')
+        print(f"   ⚠️  Не удалось извлечь JSON из ответа ИИ (preview: {preview}...)")
+        if getattr(settings, 'VERBOSE', False):
+            print(f"   DEBUG raw response:\n{text[:1000]}")
         return {}
+
+    def _extract_json_by_braces(self, text: str) -> Optional[dict]:
+        """Извлекает JSON объект из текста, отслеживая баланс скобок."""
+        start = text.find('{')
+        if start == -1:
+            return None
+
+        depth = 0
+        in_string = False
+        escape_next = False
+        end = start
+
+        for i, char in enumerate(text[start:], start):
+            if escape_next:
+                escape_next = False
+                continue
+            if char == '\\' and in_string:
+                escape_next = True
+                continue
+            if char == '"':
+                in_string = not in_string
+                continue
+            if not in_string:
+                if char == '{':
+                    depth += 1
+                elif char == '}':
+                    depth -= 1
+                    if depth == 0:
+                        end = i + 1
+                        break
+
+        if depth == 0:
+            try:
+                return json.loads(text[start:end])
+            except json.JSONDecodeError:
+                # Try simple fixes: remove trailing commas, fix single quotes
+                fixed = self._quick_json_fix(text[start:end])
+                if fixed:
+                    try:
+                        return json.loads(fixed)
+                    except json.JSONDecodeError:
+                        pass
+        return None
+
+    @staticmethod
+    def _quick_json_fix(json_str: str) -> Optional[str]:
+        """Пробует быстро исправить частые ошибки в JSON от ИИ."""
+        # Remove trailing commas before } or ]
+        fixed = re.sub(r',\s*(\}|\])', r'\1', json_str)
+        # Replace unescaped newlines in strings (simple heuristic)
+        # This is a best-effort attempt
+        try:
+            # Test if it parses now
+            json.loads(fixed)
+            return fixed
+        except json.JSONDecodeError:
+            pass
+        return None
 
     def _get_filepath(self, output_dir: Path, file_key: str) -> Optional[Path]:
         """Возвращает путь к файлу по ключу."""

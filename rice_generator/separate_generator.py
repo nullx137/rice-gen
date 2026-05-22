@@ -187,7 +187,10 @@ Return ONLY the prompt text in English, no intro, no quotes."""
             ).strip()
 
         print(f"🎨 Промпт для обоев: {image_prompt[:60]}...")
-        
+
+        # Убедимся, что директория для сохранения существует
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+
         # 2. Генерируем изображение
         if self.provider == "cometapi":
             print(f"🚀 Запрос к CometAPI для генерации изображения ({self.wallpaper_model})...")
@@ -212,7 +215,7 @@ Return ONLY the prompt text in English, no intro, no quotes."""
             }
             
             try:
-                with httpx.Client(timeout=120.0) as http_client:
+                with httpx.Client(timeout=300.0) as http_client:
                     response = http_client.post(url, headers=headers, json=payload)
                     response.raise_for_status()
                     data = response.json()
@@ -251,24 +254,44 @@ Return ONLY the prompt text in English, no intro, no quotes."""
                 print(f"❌ Ошибка API при генерации обоев: {e}")
                 return Path(output_path)
             
-            # Извлечение URL из ответа
+            # Извлечение URL или inline base64 из ответа
             image_url = None
-            
+            img_data = None
+
             # Пробуем найти URL в JSON (если модель вернула JSON)
             try:
                 data = json.loads(response_text)
                 if isinstance(data, dict):
                     image_url = data.get("url") or data.get("image_url")
-            except:
+            except Exception:
                 pass
-            
+
             # Пробуем найти URL через регулярку (включая markdown)
             if not image_url:
                 url_match = re.search(r'(https?://\S+)', response_text)
                 if url_match:
                     image_url = url_match.group(1).strip('()[]"\'')
 
-            if image_url:
+            # Пробуем найти inline base64 (data URI в markdown или тексте)
+            if not image_url:
+                b64_match = re.search(
+                    r'data:image/[^;]+;base64,([A-Za-z0-9+/=]+)',
+                    response_text,
+                )
+                if b64_match:
+                    try:
+                        img_data = base64.b64decode(b64_match.group(1))
+                        print(f"📥 Извлечены inline base64 данные из ответа")
+                    except Exception:
+                        pass
+
+            if img_data:
+                try:
+                    Path(output_path).write_bytes(img_data)
+                    print(f"✅ Обои сохранены: {output_path}")
+                except Exception as e:
+                    print(f"❌ Ошибка при сохранении изображения: {e}")
+            elif image_url:
                 print(f"📥 Загрузка изображения: {image_url}")
                 try:
                     with httpx.Client(follow_redirects=True, timeout=60.0) as http_client:

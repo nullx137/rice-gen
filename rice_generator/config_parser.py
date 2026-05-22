@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-from .config import settings
 
 
 @dataclass
@@ -148,19 +147,17 @@ class ConfigParser:
 class ConfigGenerator:
     """Генератор файлов конфигов и скриптов установки."""
 
-    def __init__(self, config: GeneratedConfig, output_dir: str | Path, wallpaper_tool: Optional[str] = None):
+    def __init__(self, config: GeneratedConfig, output_dir: str | Path):
         """
         Инициализация генератора.
 
         Args:
             config: Объект GeneratedConfig с конфигурациями.
             output_dir: Директория для сохранения файлов.
-            wallpaper_tool: Инструмент для установки обоев (feh или hyprpaper).
         """
         self.config = config
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        self.wallpaper_tool = (wallpaper_tool or settings.WALLPAPER_TOOL).lower()
 
     def generate_all(self) -> dict[str, Path]:
         """
@@ -196,7 +193,8 @@ class ConfigGenerator:
         # Копируем обои, если они есть
         if self.config.wallpaper_path and self.config.wallpaper_path.exists():
             dest = self.output_dir / "wallpaper.png"
-            shutil.copy(self.config.wallpaper_path, dest)
+            if self.config.wallpaper_path.resolve() != dest.resolve():
+                shutil.copy(self.config.wallpaper_path, dest)
             paths["wallpaper"] = dest
 
         # Генерируем скрипты
@@ -246,26 +244,31 @@ class ConfigGenerator:
         if self.config.wallpaper_path:
             wallpaper_install = f'''
 if [ -f "$SCRIPT_DIR/wallpaper.png" ]; then
-    echo -e "${{YELLOW}}[5.5/6] Установка обоев ({self.wallpaper_tool})...${{NC}}"
+    echo -e "${{YELLOW}}[5/5] Установка обоев (swaybg)...${{NC}}"
     mkdir -p "$HOME/.config/hypr"
     cp "$SCRIPT_DIR/wallpaper.png" "$HOME/.config/hypr/wallpaper.png"
-    
-    if [ "{self.wallpaper_tool}" = "hyprpaper" ]; then
-        # Настройка hyprpaper
-        cat > "$HOME/.config/hypr/hyprpaper.conf" << EOF
-preload = $HOME/.config/hypr/wallpaper.png
-wallpaper = ,$HOME/.config/hypr/wallpaper.png
-EOF
-        if pgrep -x "hyprpaper" > /dev/null; then
-            killall hyprpaper
-            sleep 1
+
+    if ! command -v swaybg &> /dev/null; then
+        echo -e "${{YELLOW}}  swaybg не найден, устанавливаем...${{NC}}"
+        if command -v pacman &> /dev/null; then
+            sudo pacman -S --needed --noconfirm swaybg || echo "  ⚠ Не удалось установить swaybg"
+        elif command -v apt &> /dev/null; then
+            sudo apt install -y swaybg || echo "  ⚠ Не удалось установить swaybg"
+        elif command -v dnf &> /dev/null; then
+            sudo dnf install -y swaybg || echo "  ⚠ Не удалось установить swaybg"
+        elif command -v zypper &> /dev/null; then
+            sudo zypper install -y swaybg || echo "  ⚠ Не удалось установить swaybg"
+        else
+            echo "  ⚠ Не удалось определить пакетный менеджер. Установите swaybg вручную."
         fi
-        hyprpaper &
-        echo "  ✓ hyprpaper запущен"
-    elif [ "{self.wallpaper_tool}" = "feh" ]; then
-        feh --bg-fill "$HOME/.config/hypr/wallpaper.png"
-        echo "  ✓ feh установлен"
     fi
+    # Убить предыдущий swaybg
+    if pgrep -x "swaybg" > /dev/null; then
+        killall swaybg
+        sleep 1
+    fi
+    swaybg -i "$HOME/.config/hypr/wallpaper.png" -m fill &
+    echo "  ✓ swaybg запущен"
 fi
 '''
 
@@ -332,7 +335,7 @@ cp "$SCRIPT_DIR/waybar_config.json" "$HOME/.config/waybar/config"
 cp "$SCRIPT_DIR/waybar_style.css" "$HOME/.config/waybar/style.css"
 echo "  ✓ Waybar конфиги установлены"
 
-echo -e "${{YELLOW}}[4/6] Установка конфигов Wofi...${{NC}}"
+echo -e "${{YELLOW}}[4/5] Установка конфигов Wofi...${{NC}}"
 mkdir -p "$HOME/.config/wofi"
 if [ -f "$SCRIPT_DIR/wofi_config" ]; then
     cp "$SCRIPT_DIR/wofi_config" "$HOME/.config/wofi/config"
@@ -342,28 +345,12 @@ if [ -f "$SCRIPT_DIR/wofi_style.css" ]; then
 fi
 echo "  ✓ Wofi конфиги установлены"
 
-echo -e "${{YELLOW}}[5/6] Установка конфигов Kitty...${{NC}}"
+echo -e "${{YELLOW}}[5/5] Установка конфигов Kitty...${{NC}}"
 mkdir -p "$HOME/.config/kitty"
 cp "$SCRIPT_DIR/kitty.conf" "$HOME/.config/kitty/kitty.conf"
 echo "  ✓ Kitty конфиг установлен"
 
 {wallpaper_install}
-
-echo -e "${{YELLOW}}[6/6] Применение изменений...${{NC}}"
-
-# Перезагрузка Waybar
-if pgrep -x "waybar" > /dev/null; then
-    killall waybar
-    sleep 1
-fi
-waybar &
-echo "  ✓ Waybar перезапущен"
-
-# Перезагрузка Kitty (требует перезапуска терминала)
-echo "  ℹ Kitty: закройте все окна Kitty и откройте заново для применения"
-
-# Перезагрузка Hyprland (применяется автоматически)
-echo "  ✓ Hyprland: конфиги применятся автоматически"
 
 echo ""
 echo -e "${{GREEN}}=== Установка завершена! ===${{NC}}"

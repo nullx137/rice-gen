@@ -1,163 +1,84 @@
-/* Waybar Style Template */
-/* Сгенерировано rice-generator */
-
+/* 1. Полный сброс */
 * {
     border: none;
+    outline: none;
+    box-shadow: none;
+    text-shadow: none;
     border-radius: 0;
-    font-family: "JetBrainsMono Nerd Font", "Noto Sans", sans-serif;
-    font-size: 14px;
-    min-height: 30px;
-    margin: 0;
     padding: 0;
+    margin: 0;
 }
 
-/* Основное окно waybar */
+/* 2. Настройка панели - плавающая с отступами */
 window#waybar {
-    background: rgba(30, 30, 46, 0.9);
-    color: #c0caf5;
-    border-bottom: 2px solid #7aa2f7;
+    background-color: #1e1e2e; /* Catppuccin Macchiato Crust - тёмный непрозрачный */
+    color: #cdd6f4;
+    font-family: "JetBrainsMono Nerd Font", "Symbols Nerd Font Mono", sans-serif;
+    font-size: 14px;
 }
 
-/* Левая часть */
+/* 3. Группы модулей */
+.modules-left, 
+.modules-center, 
+.modules-right {
+    background: transparent;
+    padding: 0 7px;
+}
+
+/* 4. Воркспейсы Niri */
 #workspaces {
-    background: rgba(26, 27, 38, 0.8);
-    margin: 2px 5px;
+    background: transparent;
     padding: 0 5px;
-    border-radius: 5px;
 }
 
 #workspaces button {
-    padding: 0 8px;
-    margin: 2px;
-    border-radius: 4px;
-    color: #a9b1d6;
+    padding: 0 9px;
+    margin: 0 2px;
+    color: #585b70;
     background: transparent;
-    transition: all 0.3s ease;
+    transition: all 0.3s ease-in-out;
+    border-bottom: 3px solid transparent;
 }
 
-#workspaces button:hover {
-    background: rgba(122, 162, 247, 0.3);
-    color: #7aa2f7;
-}
-
-#workspaces button.active {
-    background: #7aa2f7;
-    color: #1a1b26;
-    font-weight: bold;
+#workspaces button.focused {
+    color: #89b4fa;
+    border-bottom: 3px solid #89b4fa;
 }
 
 #workspaces button.urgent {
-    background: #f7768e;
-    color: #1a1b26;
+    color: #f38ba8;
+    border-bottom: 3px solid #f38ba8;
 }
 
-/* Центральная часть - окно */
-window#waybar > box > box:first-child > #window {
-    background: rgba(50, 50, 70, 0.8);
-    margin: 2px 10px;
-    padding: 0 15px;
-    border-radius: 5px;
-    color: #c0caf5;
+#workspaces button:hover {
+    background: transparent;
+    color: #cdd6f4;
+    border-bottom: 3px solid #cdd6f4;
 }
 
-/* Правая часть - модули */
-#tray,
+/* 5. Остальные модули - просто текст */
+#clock,
 #pulseaudio,
 #network,
-#battery,
-#clock,
-#custom-media {
-    margin: 2px 3px;
-    padding: 0 10px;
-    border-radius: 5px;
-    background: rgba(50, 50, 70, 0.7);
-    color: #c0caf5;
-}
-
-/* PulseAudio */
-#pulseaudio {
-    background: rgba(187, 154, 247, 0.3);
-    color: #bb9af7;
-}
-
-#pulseaudio.muted {
-    background: rgba(169, 177, 214, 0.3);
-    color: #a9b1d6;
-}
-
-/* Network */
-#network {
-    background: rgba(158, 206, 106, 0.3);
-    color: #9ece6a;
-}
-
-#network.disconnected {
-    background: rgba(247, 118, 142, 0.3);
-    color: #f7768e;
-}
-
-/* Battery */
-#battery {
-    background: rgba(224, 175, 104, 0.3);
-    color: #e0af68;
-}
-
-#battery.charging,
-#battery.plugged {
-    background: rgba(158, 206, 106, 0.3);
-    color: #9ece6a;
-}
-
-#battery.critical:not(.charging) {
-    background: rgba(247, 118, 142, 0.5);
-    color: #f7768e;
-    animation: blink 0.5s linear infinite alternate;
-}
-
-@keyframes blink {
-    to {
-        background: rgba(247, 118, 142, 0.2);
-    }
-}
-
-/* Clock */
-#clock {
-    background: rgba(122, 162, 247, 0.3);
-    color: #7aa2f7;
-    font-weight: bold;
-}
-
-#clock.date {
-    color: #bb9af7;
-}
-
-/* Tray */
-#tray {
+#language,
+#memory,
+#mpris,
+#custom-temperature,
+#custom-distro-icon,
+#custom-power {
     background: transparent;
+    padding: 0 11px;
+    margin: 0;
+    color: #cdd6f4;
 }
 
-#tray > .passive {
-    -gtk-icon-effect: dim;
-}
-
-#tray > .needs-attention {
-    -gtk-icon-effect: highlight;
-}
-
-/* Custom media */
-#custom-media {
-    background: rgba(125, 207, 255, 0.3);
-    color: #7dcfff;
-}
-
-/* Tooltip */
-tooltip {
-    background: rgba(26, 27, 38, 0.95);
-    border: 1px solid #7aa2f7;
-    border-radius: 5px;
-}
-
-tooltip label {
-    color: #c0caf5;
-    padding: 5px;
-}
+/* Цветовые акценты */
+#clock { color: #f5c2e7; }
+#pulseaudio { color: #89b4fa; }
+#network { color: #94e2d5; }
+#memory { color: #a6e3a1; }
+#custom-temperature { color: #fab387; }
+#custom-distro-icon { color: #cba6f7; }
+#language { color: #f9e2af; }
+#mpris { color: #b4befe; }
+#custom-power { color: #f38ba8; }

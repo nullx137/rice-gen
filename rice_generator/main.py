@@ -104,7 +104,6 @@ class RiceGenerator:
         hyprland_config: str | Path | None = None,
         provider: str | None = None,
         wallpaper_model: str | None = None,
-        wallpaper_tool: str | None = None,
     ):
         """
         Инициализация генератора.
@@ -117,7 +116,6 @@ class RiceGenerator:
             hyprland_config: Путь к пользовательскому hyprland.conf.
             provider: API провайдер (openrouter или cometapi).
             wallpaper_model: Модель для генерации обоев.
-            wallpaper_tool: Инструмент для установки обоев.
         """
         self.api_key = api_key
         self.templates_dir = Path(templates_dir) if templates_dir else None
@@ -126,7 +124,6 @@ class RiceGenerator:
         self.hyprland_config = Path(hyprland_config) if hyprland_config else None
         self.provider = provider or settings.API_PROVIDER
         self.wallpaper_model = wallpaper_model or settings.WALLPAPER_MODEL
-        self.wallpaper_tool = wallpaper_tool or settings.WALLPAPER_TOOL
 
         if self.templates_dir is None:
             self.templates_dir = Path(__file__).parent / "templates"
@@ -245,6 +242,7 @@ class RiceGenerator:
                 raise
 
             # 5. Генерация обоев
+            output_dir.mkdir(parents=True, exist_ok=True)
             wallpaper_path = output_dir / "wallpaper.png"
             spinner.start("Генерация обоев...", CYAN)
             try:
@@ -294,7 +292,7 @@ class RiceGenerator:
             config = parser.parse()
 
         # Генерация файлов
-        gen = ConfigGenerator(config, output_dir, wallpaper_tool=self.wallpaper_tool)
+        gen = ConfigGenerator(config, output_dir)
         paths = gen.generate_all()
 
         print(f"✅ Конфиги сгенерированы в: {output_dir.absolute()}")
