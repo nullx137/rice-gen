@@ -26,8 +26,8 @@
 ### 1. Клонирование репозитория
 
 ```bash
-git clone https://github.com/nullx137/Rice-generator
-cd Rice-generator
+git clone https://github.com/nullx137/rice-gen
+cd rice-gen
 ```
 
 ### 2. Установка зависимостей
@@ -98,7 +98,6 @@ options:
   --wallpaper-model WALLPAPER_MODEL
                         Модель для генерации обоев (по умолчанию: google/gemini-3-pro-image-preview)
   --no-wallpaper        Отключить генерацию обоев
-=======
                         Модель для генерации обоев (по умолчанию: openai/dall-e-3)
   -t TEMPLATES, --templates TEMPLATES
                         Директория с шаблонами
@@ -161,7 +160,6 @@ rice-generator/
 4. **ИИ-валидация** — нейросеть проверяет визуальное соответствие конфигов скриншоту и исправляет расхождения (только визуальные параметры, не трогая бинды и функциональные настройки)
 5. **Создание скриптов** — генерируются `installer.sh` и `uninstaller.sh`
 
-=======
 ## 📦 Выходные файлы
 
 После генерации вы получите:
@@ -175,7 +173,6 @@ output/
 ├── wofi_style.css        # Стили Wofi
 ├── kitty.conf            # Конфиг Kitty
 ├── wallpaper.png         # Сгенерированные обои (если включено)
-=======
 ├── wallpaper.png         # Сгенерированные обои (опционально)
 ├── color_scheme.json     # Информация о цветовой схеме
 ├── installer.sh          # Скрипт установки
@@ -195,9 +192,7 @@ chmod +x installer.sh
 - Установит новые конфиги (Hyprland, Waybar, Wofi, Kitty)
 - Установит обои `wallpaper.png` в `~/.config/hypr/wallpaper.png` (если были сгенерированы)
 - Перезапустит Waybar
-=======
 - Установит обои через swaybg (если сгенерированы)
->>>>>>> 19bba975c3ba1563a80f2431b927745f39e0d1e4
 
 ## ↩️ Откат изменений
 
