@@ -79,7 +79,6 @@ python -m rice_generator screenshot.png --wallpaper-model openai/dall-e-3 -o ./o
 
 ```
 usage: rice-generator [-h] [-o OUTPUT] [--api-key API_KEY] [--provider PROVIDER] [-m MODEL] [--wallpaper-model WALLPAPER_MODEL] [--no-wallpaper] [-t TEMPLATES] [-H HYPRLAND_CONFIG] [-v] [--version]
-=======
 usage: rice-generator [-h] [-o OUTPUT] [--api-key API_KEY] [--provider PROVIDER]
                       [-m MODEL] [--wallpaper-model WALLPAPER_MODEL]
                       [-t TEMPLATES] [-H HYPRLAND_CONFIG] [-v] [--version]
@@ -194,7 +193,6 @@ chmod +x installer.sh
 Скрипт:
 - Создаст бэкап текущих конфигов в `~/.config/rice_backups/`
 - Установит новые конфиги (Hyprland, Waybar, Wofi, Kitty)
-<<<<<<< HEAD
 - Установит обои `wallpaper.png` в `~/.config/hypr/wallpaper.png` (если были сгенерированы)
 - Перезапустит Waybar
 =======
