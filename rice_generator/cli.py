@@ -19,31 +19,25 @@ def main():
 Примеры использования:
   %(prog)s screenshot.png -o ./output
   %(prog)s ~/Pictures/rice.png --api-key your_key
-<<<<<<< HEAD
   %(prog)s screenshot.png -o ./my-rice --templates ./custom-templates
   %(prog)s screenshot.png --model google/gemini-2.0-flash-001
   %(prog)s screenshot.png -H ~/.config/hypr/hyprland.conf  # использовать свой конфиг
   %(prog)s screenshot.png --provider cometapi --api-key your_key  # использовать CometAPI
   %(prog)s screenshot.png --no-wallpaper                           # без обоев
   %(prog)s screenshot.png --wallpaper-model google/gemini-3-pro-image-preview
-=======
   %(prog)s screenshot.png --wallpaper-model openai/dall-e-3
->>>>>>> 19bba975c3ba1563a80f2431b927745f39e0d1e4
 
 Переменные окружения:
   API_PROVIDER           Провайдер API: openrouter или cometapi (по умолчанию: openrouter)
   OPENROUTER_API_KEY     API ключ для OpenRouter
-<<<<<<< HEAD
   COMETAPI_API_KEY     API ключ для CometAPI
   RICE_MODEL            Модель для анализа (по умолчанию: google/gemini-2.0-flash-exp:free)
   WALLPAPER_ENABLED      Генерировать обои: true или false (по умолчанию: true)
   WALLPAPER_MODEL        Модель для генерации обоев (по умолчанию: google/gemini-3-pro-image-preview)
   REQUEST_TIMEOUT       Таймаут запроса в секундах (по умолчанию: 120)
   MAX_TOKENS            Максимум токенов в ответе (по умолчанию: 4096)
-=======
   RICE_MODEL            Модель для анализа (по умолчанию: google/gemini-3-flash-preview)
   WALLPAPER_MODEL       Модель для генерации обоев (по умолчанию: openai/dall-e-3)
->>>>>>> 19bba975c3ba1563a80f2431b927745f39e0d1e4
         """,
     )
 
@@ -88,17 +82,14 @@ def main():
         "--wallpaper-model",
         type=str,
         default=None,
-<<<<<<< HEAD
-        help="Модель для генерации обоев (по умолчанию: из конфига WALLPAPER_MODEL)",
+        help="Модель для генерации обоев (по умолчанию: из конфига WALLPAPER_MODEL)\n"
+             "Модель для генерации обоев (по умолчанию: из конфига)",
     )
 
     parser.add_argument(
         "--no-wallpaper",
         action="store_true",
         help="Отключить генерацию обоев",
-=======
-        help="Модель для генерации обоев (по умолчанию: из конфига)",
->>>>>>> 19bba975c3ba1563a80f2431b927745f39e0d1e4
     )
 
     parser.add_argument(
@@ -132,19 +123,15 @@ def main():
 
     args = parser.parse_args()
 
-<<<<<<< HEAD
     # Проверка наличия API ключа
     api_key = args.api_key if args.api_key else None
 
-=======
->>>>>>> 19bba975c3ba1563a80f2431b927745f39e0d1e4
     try:
         provider = args.provider or settings.API_PROVIDER
         print("🚀 Rice Generator v0.1.0")
         print(f"📡 API: {provider}")
         print("=" * 40)
 
-<<<<<<< HEAD
         generator = RiceGenerator(
             api_key=args.api_key,
             templates_dir=args.templates,
@@ -154,16 +141,6 @@ def main():
             wallpaper_model=args.wallpaper_model,
             wallpaper_enabled=not args.no_wallpaper,
         )
-=======
-            generator = RiceGenerator(
-                api_key=args.api_key,
-                templates_dir=args.templates,
-                model=args.model,
-                hyprland_config=args.hyprland_config,
-                provider=provider,
-                wallpaper_model=args.wallpaper_model,
-            )
->>>>>>> 19bba975c3ba1563a80f2431b927745f39e0d1e4
 
         paths = generator.generate(
             screenshot_path=args.screenshot,

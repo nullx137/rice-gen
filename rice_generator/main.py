@@ -104,10 +104,7 @@ class RiceGenerator:
         hyprland_config: str | Path | None = None,
         provider: str | None = None,
         wallpaper_model: str | None = None,
-<<<<<<< HEAD
         wallpaper_enabled: bool = True,
-=======
->>>>>>> 19bba975c3ba1563a80f2431b927745f39e0d1e4
     ):
         """
         Инициализация генератора.
@@ -119,12 +116,9 @@ class RiceGenerator:
             separate: Использовать раздельные запросы (рекомендуется).
             hyprland_config: Путь к пользовательскому hyprland.conf.
             provider: API провайдер (openrouter или cometapi).
-<<<<<<< HEAD
             wallpaper_model: Модель для генерации обоев (по умолчанию из конфига).
             wallpaper_enabled: Включить генерацию обоев.
-=======
             wallpaper_model: Модель для генерации обоев.
->>>>>>> 19bba975c3ba1563a80f2431b927745f39e0d1e4
         """
         self.api_key = api_key
         self.templates_dir = Path(templates_dir) if templates_dir else None
@@ -133,10 +127,7 @@ class RiceGenerator:
         self.hyprland_config = Path(hyprland_config) if hyprland_config else None
         self.provider = provider or settings.API_PROVIDER
         self.wallpaper_model = wallpaper_model or settings.WALLPAPER_MODEL
-<<<<<<< HEAD
         self.wallpaper_enabled = wallpaper_enabled
-=======
->>>>>>> 19bba975c3ba1563a80f2431b927745f39e0d1e4
 
         if self.templates_dir is None:
             self.templates_dir = Path(__file__).parent / "templates"
@@ -254,7 +245,6 @@ class RiceGenerator:
                 spinner.stop(success=False)
                 raise
 
-<<<<<<< HEAD
             # 5. Генерация обоев (опционально, отдельная модель)
             wallpaper_bytes: bytes | None = None
             if self.wallpaper_enabled:
@@ -277,7 +267,6 @@ class RiceGenerator:
                     spinner.stop(success=False)
                     print(f"{RED}⚠ Ошибка генерации обоев: {e}{RESET}")
                     wallpaper_bytes = None
-=======
             # 5. Генерация обоев
             output_dir.mkdir(parents=True, exist_ok=True)
             wallpaper_path = output_dir / "wallpaper.png"
@@ -291,7 +280,6 @@ class RiceGenerator:
             except Exception:
                 spinner.stop(success=False)
                 wallpaper_path = None
->>>>>>> 19bba975c3ba1563a80f2431b927745f39e0d1e4
 
             print("=" * 40)
             print("📝 Обработка результатов...")

@@ -193,18 +193,15 @@ class ConfigGenerator:
             
         paths["kitty"] = self._save_file("kitty.conf", self.config.kitty_conf)
 
-<<<<<<< HEAD
         # Обои
         if wallpaper_bytes:
             paths["wallpaper"] = self._save_binary("wallpaper.png", wallpaper_bytes)
-=======
         # Копируем обои, если они есть
         if self.config.wallpaper_path and self.config.wallpaper_path.exists():
             dest = self.output_dir / "wallpaper.png"
             if self.config.wallpaper_path.resolve() != dest.resolve():
                 shutil.copy(self.config.wallpaper_path, dest)
             paths["wallpaper"] = dest
->>>>>>> 19bba975c3ba1563a80f2431b927745f39e0d1e4
 
         # Генерируем скрипты
         paths["installer"] = self._generate_installer(wallpaper_bytes is not None)
@@ -267,7 +264,6 @@ class ConfigGenerator:
         Returns:
             Путь к скрипту установщика.
         """
-<<<<<<< HEAD
         wallpaper_section = """
 # Установка обоев
 if [ -f "$SCRIPT_DIR/wallpaper.png" ]; then
@@ -275,7 +271,6 @@ if [ -f "$SCRIPT_DIR/wallpaper.png" ]; then
     echo "  ✓ Wallpaper установлен"
 fi
 """ if has_wallpaper else ""
-=======
         wallpaper_install = ""
         if self.config.wallpaper_path:
             wallpaper_install = f'''
@@ -307,7 +302,6 @@ if [ -f "$SCRIPT_DIR/wallpaper.png" ]; then
     echo "  ✓ swaybg запущен"
 fi
 '''
->>>>>>> 19bba975c3ba1563a80f2431b927745f39e0d1e4
 
         script = f'''#!/bin/bash
 # Installer для rice конфига
@@ -372,11 +366,8 @@ cp "$SCRIPT_DIR/waybar_config.json" "$HOME/.config/waybar/config"
 cp "$SCRIPT_DIR/waybar_style.css" "$HOME/.config/waybar/style.css"
 echo "  ✓ Waybar конфиги установлены"
 
-<<<<<<< HEAD
 echo -e "${{YELLOW}}[4/6] Установка конфигов Wofi...${{NC}}"
-=======
 echo -e "${{YELLOW}}[4/5] Установка конфигов Wofi...${{NC}}"
->>>>>>> 19bba975c3ba1563a80f2431b927745f39e0d1e4
 mkdir -p "$HOME/.config/wofi"
 if [ -f "$SCRIPT_DIR/wofi_config" ]; then
     cp "$SCRIPT_DIR/wofi_config" "$HOME/.config/wofi/config"
@@ -386,16 +377,12 @@ if [ -f "$SCRIPT_DIR/wofi_style.css" ]; then
 fi
 echo "  ✓ Wofi конфиги установлены"
 
-<<<<<<< HEAD
 echo -e "${{YELLOW}}[5/6] Установка конфигов Kitty...${{NC}}"
-=======
 echo -e "${{YELLOW}}[5/5] Установка конфигов Kitty...${{NC}}"
->>>>>>> 19bba975c3ba1563a80f2431b927745f39e0d1e4
 mkdir -p "$HOME/.config/kitty"
 cp "$SCRIPT_DIR/kitty.conf" "$HOME/.config/kitty/kitty.conf"
 echo "  ✓ Kitty конфиг установлен"
 
-<<<<<<< HEAD
 echo -e "${{YELLOW}}[6/6] Применение изменений...${{NC}}"
 {wallpaper_section}
 # Перезагрузка Waybar
@@ -411,9 +398,7 @@ echo "  ℹ Kitty: закройте все окна Kitty и откройте з
 
 # Перезагрузка Hyprland (применяется автоматически)
 echo "  ✓ Hyprland: конфиги применятся автоматически"
-=======
 {wallpaper_install}
->>>>>>> 19bba975c3ba1563a80f2431b927745f39e0d1e4
 
 echo ""
 echo -e "${{GREEN}}=== Установка завершена! ===${{NC}}"
